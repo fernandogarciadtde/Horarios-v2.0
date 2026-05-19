@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Service Desk | Planificador de Turnos</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Universidad Central | Service Desk</p>
+        <h1>Planificador de turnos</h1>
+      </div>
+      <div class="admin-pill">
+        <span id="sessionRole">Administrador</span>
+        <strong id="sessionName">Usuario</strong>
+        <button id="passwordBtn" class="logout-button">Contraseña</button>
+        <button id="logoutBtn" class="logout-button">Salir</button>
+      </div>
+    </header>
+
+    <main id="appShell" class="app-shell" hidden>
+      <aside class="sidebar">
+        <section class="panel">
+          <h2>Periodo</h2>
+          <label>
+            Mes
+            <select id="monthSelect"></select>
+          </label>
+          <label>
+            Año
+            <input id="yearInput" type="number" min="2026" max="2035" />
+          </label>
+          <div class="button-row">
+            <button id="generateBtn" class="primary">Sugerir horario</button>
+            <button id="exportBtn">Exportar Excel</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-head">
+            <h2>Agentes</h2>
+            <button id="resetBtn" class="ghost">Restaurar</button>
+          </div>
+          <div id="agentsList" class="agents-list"></div>
+          <button id="addAgentBtn" class="wide">Agregar agente</button>
+        </section>
+
+        <section class="panel">
+          <h2>Feriados y obligatorios</h2>
+          <div class="inline-form">
+            <input id="specialDateInput" type="date" />
+            <select id="specialTypeInput">
+              <option value="holiday">Feriado</option>
+              <option value="mandatory">Asistencia obligatoria</option>
+            </select>
+            <button id="addSpecialBtn">Agregar</button>
+          </div>
+          <div id="specialDaysList" class="compact-list"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Bloqueos recurrentes</h2>
+          <div class="inline-form">
+            <select id="lockAgentInput"></select>
+            <select id="lockDayInput">
+              <option value="1">Lunes</option>
+              <option value="2">Martes</option>
+              <option value="3">Miércoles</option>
+              <option value="4">Jueves</option>
+              <option value="5">Viernes</option>
+            </select>
+            <select id="lockModeInput">
+              <option value="remote">Remoto</option>
+              <option value="onsite">Presencial</option>
+            </select>
+            <button id="addLockBtn">Bloquear</button>
+          </div>
+          <div id="locksList" class="compact-list"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Ausencias</h2>
+          <div class="absence-grid">
+            <select id="absenceAgentInput"></select>
+            <select id="absenceTypeInput">
+              <option value="admin">Día administrativo</option>
+              <option value="medical">Licencia médica</option>
+            </select>
+            <input id="absenceFromInput" type="date" />
+            <input id="absenceToInput" type="date" />
+            <label class="checkline">
+              <input id="absenceIndefInput" type="checkbox" />
+              Indefinida
+            </label>
+            <button id="addAbsenceBtn">Agregar</button>
+          </div>
+          <div id="absencesList" class="compact-list"></div>
+        </section>
+
+        <section id="usersPanel" class="panel" hidden>
+          <h2>Usuarios</h2>
+          <div id="usersList" class="compact-list"></div>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <section id="rulesPanel" class="rules-panel"></section>
+        <section class="legend">
+          <span><i class="swatch onsite"></i>Disponible presencial</span>
+          <span><i class="swatch remote"></i>Remoto</span>
+          <span><i class="swatch admin"></i>Administrativo</span>
+          <span><i class="swatch medical"></i>Licencia médica</span>
+          <span><i class="swatch union"></i>Salida sindicato</span>
+          <span><i class="swatch holiday"></i>Feriado</span>
+        </section>
+        <div id="calendarView" class="calendar-view"></div>
+      </section>
+    </main>
+
+    <dialog id="cellDialog">
+      <form method="dialog" class="modal">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow" id="modalDate"></p>
+            <h2 id="modalAgent"></h2>
+          </div>
+          <button value="cancel" class="icon-button" aria-label="Cerrar">×</button>
+        </div>
+        <label>
+          Estado del bloque
+          <select id="cellStatusInput">
+            <option value="A-onsite">Turno A presencial</option>
+            <option value="B-onsite">Turno B presencial</option>
+            <option value="A-remote">Turno A remoto</option>
+            <option value="B-remote">Turno B remoto</option>
+            <option value="A-onsite-union">Turno A presencial + salida sindicato</option>
+            <option value="B-onsite-union">Turno B presencial + salida sindicato</option>
+            <option value="A-remote-union">Turno A remoto + salida sindicato</option>
+            <option value="B-remote-union">Turno B remoto + salida sindicato</option>
+            <option value="admin">Administrativo</option>
+            <option value="medical">Licencia médica</option>
+            <option value="holiday">Feriado</option>
+          </select>
+        </label>
+        <label class="checkline">
+          <input id="cellLockedInput" type="checkbox" />
+          Bloquear este bloque para futuras regeneraciones
+        </label>
+        <div class="button-row end">
+          <button value="cancel">Cancelar</button>
+          <button id="saveCellBtn" value="default" class="primary">Guardar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="passwordDialog">
+      <form method="dialog" class="modal">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Cuenta</p>
+            <h2>Cambiar contraseña</h2>
+          </div>
+          <button value="cancel" class="icon-button" aria-label="Cerrar">×</button>
+        </div>
+        <label>
+          Contraseña actual
+          <input id="currentPasswordInput" type="password" autocomplete="current-password" />
+        </label>
+        <label>
+          Nueva contraseña
+          <input id="newPasswordInput" type="password" autocomplete="new-password" />
+        </label>
+        <p id="passwordMessage" class="login-error"></p>
+        <div class="button-row end">
+          <button value="cancel">Cancelar</button>
+          <button id="savePasswordBtn" value="default" class="primary">Guardar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="resetPasswordDialog">
+      <form method="dialog" class="modal">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Administración</p>
+            <h2 id="resetPasswordTitle">Resetear contraseña</h2>
+          </div>
+          <button value="cancel" class="icon-button" aria-label="Cerrar">×</button>
+        </div>
+        <label>
+          Nueva contraseña temporal
+          <input id="adminPasswordInput" type="password" autocomplete="new-password" />
+        </label>
+        <p id="resetPasswordMessage" class="login-error"></p>
+        <div class="button-row end">
+          <button value="cancel">Cancelar</button>
+          <button id="saveResetPasswordBtn" value="default" class="primary">Guardar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>

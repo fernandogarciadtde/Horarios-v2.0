@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Acceso | Planificador Service Desk</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Universidad Central | Service Desk</p>
+        <h1>Planificador de turnos</h1>
+      </div>
+      <div class="admin-pill">
+        <span>Acceso interno</span>
+        <strong>Calendario de turnos</strong>
+      </div>
+    </header>
+
+    <main class="login-view">
+      <form id="loginForm" class="login-card">
+        <p class="eyebrow">Acceso interno</p>
+        <h2>Planificador Service Desk</h2>
+        <label>
+          Correo
+          <input id="loginEmail" type="email" autocomplete="username" placeholder="correo institucional" required />
+        </label>
+        <label>
+          Contraseña
+          <input id="loginPassword" type="password" autocomplete="current-password" required />
+        </label>
+        <p id="loginError" class="login-error"></p>
+        <button class="primary wide" type="submit">Ingresar</button>
+      </form>
+    </main>
+
+    <script src="login.js"></script>
+  </body>
+</html>
