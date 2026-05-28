@@ -6,3 +6,5 @@ node_modules/
 *.log
 *.zip
 demo-server.js
+local_data/
+__pycache__/

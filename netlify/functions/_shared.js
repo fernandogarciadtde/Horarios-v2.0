@@ -1,4 +1,4 @@
-const crypto = require("node:crypto");
+﻿const crypto = require("node:crypto");
 const { getStore } = require("@netlify/blobs");
 
 const cookieName = "ucen_sd_session";
@@ -53,8 +53,8 @@ function createDefaultUsers() {
   assertRequiredEnv();
   const tutors = [
     [process.env.TUTOR_MONSERRAT_EMAIL, "Monserrat Vargas"],
-    [process.env.TUTOR_VIVIANA_EMAIL, "Viviana Briceño"],
-    [process.env.TUTOR_FERNANDO_EMAIL, "Fernando García"],
+    [process.env.TUTOR_VIVIANA_EMAIL, "Viviana BriceÃ±o"],
+    [process.env.TUTOR_FERNANDO_EMAIL, "Fernando GarcÃ­a"],
     [process.env.TUTOR_DENISSE_BRAVO_EMAIL, "Denisse Bravo"],
     [process.env.TUTOR_DENISSE_ROSSEL_EMAIL, "Denisse Rossel"],
   ];
@@ -80,7 +80,7 @@ function createDefaultUsers() {
       ),
     createUser({
       id: "cafe-digital",
-      name: process.env.CAFE_DIGITAL_NAME || "Café Digital",
+      name: process.env.CAFE_DIGITAL_NAME || "CafÃ© Digital",
       email: process.env.CAFE_DIGITAL_EMAIL,
       password: process.env.DEFAULT_CAFE_PASSWORD,
       role: "cafe_digital",
@@ -95,6 +95,7 @@ function createUser({ id, name, email, password, role }) {
     name,
     email,
     role,
+    photo: "",
     passwordHash: hashPassword(password, salt),
     salt,
     mustChangePassword: true,
@@ -128,6 +129,7 @@ function publicUser(user) {
     name: user.name,
     email: user.email,
     role: user.role,
+    photo: user.photo || "",
     mustChangePassword: Boolean(user.mustChangePassword),
   };
 }
@@ -191,16 +193,19 @@ async function writeState(state) {
 }
 
 function createDefaultState() {
+  const agents = [
+    "Monserrat Vargas",
+    "Viviana Briceño",
+    "Fernando García",
+    "Denisse Bravo",
+    "Denisse Rossel",
+  ].map((name, index) => ({ id: crypto.randomUUID(), name, order: index }));
+  const monserrat = agents.find((agent) => agent.name === "Monserrat Vargas");
+
   return {
     month: 4,
     year: 2026,
-    agents: [
-      "Monserrat Vargas",
-      "Viviana Briceño",
-      "Fernando García",
-      "Denisse Bravo",
-      "Denisse Rossel",
-    ].map((name, index) => ({ id: crypto.randomUUID(), name, order: index })),
+    agents,
     specialDays: [
       "2026-01-01",
       "2026-04-03",
@@ -220,7 +225,9 @@ function createDefaultState() {
       "2026-12-25",
     ].map((date) => ({ id: crypto.randomUUID(), date, type: "holiday" })),
     recurringLocks: [],
-    absences: [],
+    absences: monserrat
+      ? [{ id: crypto.randomUUID(), agentId: monserrat.id, type: "medical", from: "2026-01-01", to: "", indefinite: true }]
+      : [],
     manualOverrides: {},
     schedule: {},
   };
@@ -266,3 +273,4 @@ module.exports = {
   writeState,
   writeUsers,
 };
+

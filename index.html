@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Service Desk | Planificador de Turnos</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=remote-rules-20260519h" />
   </head>
   <body>
     <header class="topbar">
@@ -13,9 +13,14 @@
         <h1>Planificador de turnos</h1>
       </div>
       <div class="admin-pill">
-        <span id="sessionRole">Administrador</span>
-        <strong id="sessionName">Usuario</strong>
+        <div id="sessionAvatar" class="profile-avatar"><span>U</span></div>
+        <div class="session-text">
+          <span id="sessionRole">Administrador</span>
+          <strong id="sessionName">Usuario</strong>
+        </div>
         <button id="passwordBtn" class="logout-button">Contraseña</button>
+        <input id="profilePhotoInput" class="visually-hidden" type="file" accept="image/*" />
+        <button id="profilePhotoBtn" class="logout-button">Foto</button>
         <button id="logoutBtn" class="logout-button">Salir</button>
       </div>
     </header>
@@ -32,13 +37,26 @@
             Año
             <input id="yearInput" type="number" min="2026" max="2035" />
           </label>
+          <label>
+            Vista
+            <select id="calendarViewMode">
+              <option value="month">Todo el mes</option>
+              <option value="week">Solo la semana</option>
+              <option value="my-week">Mis turnos semanales</option>
+              <option value="my-month">Mis turnos mensuales</option>
+            </select>
+          </label>
+          <label id="weekSelectLabel">
+            Semana
+            <select id="weekSelect"></select>
+          </label>
           <div class="button-row">
-            <button id="generateBtn" class="primary">Sugerir horario</button>
+            <button id="generateBtn" class="primary" data-admin-only>Sugerir horario</button>
             <button id="exportBtn">Exportar Excel</button>
           </div>
         </section>
 
-        <section class="panel">
+        <section class="panel" data-admin-only>
           <div class="section-head">
             <h2>Agentes</h2>
             <button id="resetBtn" class="ghost">Restaurar</button>
@@ -47,12 +65,13 @@
           <button id="addAgentBtn" class="wide">Agregar agente</button>
         </section>
 
-        <section class="panel">
-          <h2>Feriados y obligatorios</h2>
+        <section class="panel" data-admin-only>
+          <h2>Feriados, recesos y obligatorios</h2>
           <div class="inline-form">
             <input id="specialDateInput" type="date" />
             <select id="specialTypeInput">
               <option value="holiday">Feriado</option>
+              <option value="recess">Receso institucional</option>
               <option value="mandatory">Asistencia obligatoria</option>
             </select>
             <button id="addSpecialBtn">Agregar</button>
@@ -60,7 +79,7 @@
           <div id="specialDaysList" class="compact-list"></div>
         </section>
 
-        <section class="panel">
+        <section class="panel" data-admin-only>
           <h2>Bloqueos recurrentes</h2>
           <div class="inline-form">
             <select id="lockAgentInput"></select>
@@ -80,12 +99,14 @@
           <div id="locksList" class="compact-list"></div>
         </section>
 
-        <section class="panel">
+        <section class="panel" data-admin-only>
           <h2>Ausencias</h2>
           <div class="absence-grid">
             <select id="absenceAgentInput"></select>
             <select id="absenceTypeInput">
               <option value="admin">Día administrativo</option>
+              <option value="admin_morning">ADM A mañana</option>
+              <option value="admin_afternoon">ADM B tarde</option>
               <option value="medical">Licencia médica</option>
             </select>
             <input id="absenceFromInput" type="date" />
@@ -99,14 +120,14 @@
           <div id="absencesList" class="compact-list"></div>
         </section>
 
-        <section id="usersPanel" class="panel" hidden>
+        <section id="usersPanel" class="panel" data-admin-only hidden>
           <h2>Usuarios</h2>
           <div id="usersList" class="compact-list"></div>
         </section>
       </aside>
 
       <section class="workspace">
-        <section id="rulesPanel" class="rules-panel"></section>
+        <section id="rulesPanel" class="rules-panel" data-admin-only></section>
         <section class="legend">
           <span><i class="swatch onsite"></i>Disponible presencial</span>
           <span><i class="swatch remote"></i>Remoto</span>
@@ -114,6 +135,7 @@
           <span><i class="swatch medical"></i>Licencia médica</span>
           <span><i class="swatch union"></i>Salida sindicato</span>
           <span><i class="swatch holiday"></i>Feriado</span>
+          <span><i class="swatch recess"></i>Receso institucional</span>
         </section>
         <div id="calendarView" class="calendar-view"></div>
       </section>
@@ -140,6 +162,8 @@
             <option value="A-remote-union">Turno A remoto + salida sindicato</option>
             <option value="B-remote-union">Turno B remoto + salida sindicato</option>
             <option value="admin">Administrativo</option>
+            <option value="admin_morning">ADM A mañana</option>
+            <option value="admin_afternoon">ADM B tarde</option>
             <option value="medical">Licencia médica</option>
             <option value="holiday">Feriado</option>
           </select>
@@ -201,6 +225,6 @@
       </form>
     </dialog>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=remote-rules-20260519h"></script>
   </body>
 </html>
