@@ -1,12 +1,9 @@
 {
-  "name": "planificador-service-desk-ucentral-netlify",
+  "name": "planificador-service-desk-ucentral-python",
   "version": "1.0.0",
-  "description": "Version autonoma para Netlify del planificador Service Desk UCEN.",
+  "description": "Version local Python del planificador Service Desk UCEN.",
   "scripts": {
-    "check": "node --check app.js && node --check login.js && node --check netlify/functions/_shared.js && node --check netlify/functions/login.js && node --check netlify/functions/session.js && node --check netlify/functions/state.js && node --check netlify/functions/logout.js && node --check netlify/functions/reset-state.js && node --check netlify/functions/reset-users.js && node --check netlify/functions/change-password.js && node --check netlify/functions/users.js"
-  },
-  "dependencies": {
-    "@netlify/blobs": "^8.1.0"
+    "check": "node --check app.js && node --check login.js"
   },
   "engines": {
     "node": ">=20"

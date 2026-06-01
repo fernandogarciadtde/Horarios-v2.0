@@ -1,148 +1,117 @@
-# Planificador Service Desk UCEN - Versión Netlify
+# Planificador Service Desk UCEN - Version Python local
 
-Versión autónoma para desplegar en Netlify con frontend estático, Netlify Functions y Netlify Blobs como almacenamiento compartido.
+Aplicacion local para planificar turnos del equipo Service Desk de la Universidad Central de Chile.
 
-## Qué permite
+Esta es la version oficial del proyecto. Se ejecuta con Python en el computador donde se va a trabajar y guarda los datos en archivos locales dentro de `local_data`.
 
-- Login de administrador y consulta.
-- Login separado en `login.html`, con redirección automática al calendario después de iniciar sesión.
-- Cuentas persistentes con perfiles `admin`, `tutor` y `cafe_digital`.
-- Cambio de contraseña para cada usuario.
-- Reset de contraseña desde el perfil administrador.
-- Cristopher edita y todos los usuarios autenticados ven el mismo calendario.
-- Persistencia compartida en Netlify Blobs.
-- Exportación a Excel `.xls`.
-- Reglas de turnos, ausencias, feriados, bloqueos y validación visual.
-- Estado `salida anticipada sindicato`: toma las dos últimas horas de cualquier jornada y sigue contando dentro del total del turno/modalidad asignados.
+## Que permite
 
-## Importante
+- Login separado en `login.html`, con redireccion automatica al calendario.
+- Perfil administrador para editar, generar, bloquear, registrar ausencias y resetear contrasenas.
+- Perfiles tutor para consultar turnos sin editar configuracion.
+- Cambio de contrasena para cada usuario.
+- Panel de administracion separado del calendario.
+- Persistencia local en `local_data/state.json` y `local_data/users.json`.
+- Reglas de turnos, ausencias, feriados, bloqueos recurrentes y validacion visual.
+- Exportacion semanal en PDF desde el navegador.
+- Estado `salida anticipada sindicato`: toma las dos ultimas horas de una jornada y mantiene el conteo dentro del turno asignado.
 
-Esta versión no usa SQLite ni servidor propio. Está pensada para Netlify.
+## Requisitos
 
-## Variables de entorno en Netlify
+- Windows 10/11.
+- Python 3.10 o superior.
+- No requiere instalar paquetes con `pip`.
+- No requiere Node para ejecutar la app.
 
-Configurar en:
+## Iniciar
+
+Opcion simple:
+
+```bat
+iniciar_app_python.bat
+```
+
+Opcion por consola:
+
+```bat
+python local_server.py
+```
+
+Luego abrir:
 
 ```text
-Site configuration -> Environment variables
+http://127.0.0.1:4174
 ```
 
-Variables:
+Si necesitas otro puerto:
 
-```env
-ADMIN_NAME=Nombre Administrador
-ADMIN_EMAIL=admin@example.com
-ADMIN_PASSWORD=contraseña_segura_definida_en_netlify
-
-DEFAULT_TUTOR_PASSWORD=contraseña_temporal_tutores
-TUTOR_MONSERRAT_EMAIL=monserrat@example.com
-TUTOR_VIVIANA_EMAIL=viviana@example.com
-TUTOR_FERNANDO_EMAIL=fernando@example.com
-TUTOR_DENISSE_BRAVO_EMAIL=denisse.bravo@example.com
-TUTOR_DENISSE_ROSSEL_EMAIL=denisse.rossel@example.com
-
-CAFE_DIGITAL_NAME=Cafe Digital
-CAFE_DIGITAL_EMAIL=cafe@example.com
-DEFAULT_CAFE_PASSWORD=contraseña_temporal_cafe
-
-SESSION_DAYS=7
-SESSION_SECRET=texto_largo_aleatorio_definido_en_netlify
-RECOVERY_TOKEN=token_temporal_para_reinicializar_usuarios
-NETLIFY_BLOBS_SITE_ID=project_id_de_netlify
-NETLIFY_BLOBS_TOKEN=personal_access_token_de_netlify
-COOKIE_SECURE=true
+```bat
+set PORT=4175
+python local_server.py
 ```
 
-## Despliegue conectado a GitHub
-
-1. Subir esta carpeta como repositorio GitHub.
-2. En Netlify seleccionar **Add new site -> Import an existing project**.
-3. Conectar con GitHub.
-4. Build command: dejar vacío o usar:
-
-```bash
-npm install
-```
-
-5. Publish directory:
+## Usuarios iniciales
 
 ```text
-.
+Administrador:
+cristopher.calabran@ucentral.cl
+Cambiar.2026!
+
+Tutor ejemplo:
+fernando.garcia@ucentral.cl
+Tutor.2026!
 ```
 
-6. Functions directory:
+Los usuarios iniciales se crean automaticamente la primera vez que se inicia la app.
+
+## Datos locales
+
+La carpeta `local_data` se crea automaticamente y contiene:
 
 ```text
-netlify/functions
+local_data/state.json
+local_data/users.json
 ```
 
-Netlify también lee estas rutas desde `netlify.toml`.
+Estos archivos guardan calendario, usuarios, fotos y contrasenas. Para respaldar la app basta copiar la carpeta completa, incluyendo `local_data`.
 
-## Despliegue manual
+`local_data` no se sube a GitHub para evitar publicar datos operativos o contrasenas.
 
-También se puede arrastrar esta carpeta en Netlify, pero para usar funciones y dependencias es más confiable conectar el repositorio GitHub.
+## Continuar desde otro computador
 
-## Usuarios
+En el computador de la oficina:
 
-- `admin`: puede editar, generar, bloquear, registrar ausencias y resetear.
-- `tutor`: Monserrat Vargas, Viviana Briceño, Fernando García, Denisse Bravo y Denisse Rossel. Pueden ver y exportar, sin editar.
-- `cafe_digital`: perfil de visita para ver y exportar, sin editar.
+```bat
+git clone https://github.com/fernandogarciadtde/Horarios-v2.0.git
+cd Horarios-v2.0
+iniciar_app_python.bat
+```
 
-Los usuarios iniciales se crean automáticamente en el primer uso. Cada usuario queda marcado con cambio de contraseña pendiente.
+Si ya existe la carpeta:
 
-## Recuperar acceso
+```bat
+git pull origin main
+iniciar_app_python.bat
+```
 
-Si las contraseñas no funcionan porque los usuarios se crearon antes de configurar las variables correctas, define `RECOVERY_TOKEN` en Netlify y visita:
+## Reiniciar datos
+
+Desde la app, el administrador puede usar el boton de restaurar estado. Eso reinicia calendario y configuracion de turnos, pero conserva usuarios guardados.
+
+Para partir completamente desde cero, cerrar el servidor y borrar la carpeta:
 
 ```text
-https://TU-SITIO.netlify.app/api/reset-users?token=VALOR_DE_RECOVERY_TOKEN
+local_data
 ```
 
-Luego ingresa con `ADMIN_EMAIL` y `ADMIN_PASSWORD`. Después de recuperar el acceso, cambia o elimina `RECOVERY_TOKEN` en Netlify.
+Al volver a abrir, se recrean usuarios y estado inicial.
 
-## Configurar Netlify Blobs manualmente
+## Nota operativa
 
-Si Netlify muestra `MissingBlobsEnvironmentError`, agrega estas variables:
+Por defecto el servidor queda disponible solo en el equipo local:
 
 ```text
-NETLIFY_BLOBS_SITE_ID
-NETLIFY_BLOBS_TOKEN
+127.0.0.1:4174
 ```
 
-El `NETLIFY_BLOBS_SITE_ID` es el `Project ID` del sitio. Está en:
-
-```text
-Project configuration -> General -> Project information -> Project ID
-```
-
-El `NETLIFY_BLOBS_TOKEN` es un Personal Access Token de Netlify. Se crea en:
-
-```text
-User settings -> Applications -> Personal access tokens -> New access token
-```
-
-## Bloqueo de días pasados
-
-Los días vencidos quedan bloqueados automáticamente después de las `23:59`. Si Cristopher recalcula a mitad de semana, el sistema conserva esos bloques y no los mueve.
-
-## Exportación Excel
-
-La exportación replica la estructura mensual/semanal del archivo de referencia:
-
-- Tabla superior de turnos.
-- Semana agrupada en columna lateral.
-- Encabezados grises.
-- Teletrabajo en morado.
-- Administrativo en celeste.
-- Sábado y feriados en gris.
-- Bordes negros.
-
-## Seguridad
-
-- No subir `.env` a GitHub.
-- Cambiar `ADMIN_PASSWORD`, `DEFAULT_TUTOR_PASSWORD`, `DEFAULT_CAFE_PASSWORD` y `SESSION_SECRET` antes de usar.
-- Usar siempre HTTPS. Netlify lo entrega por defecto.
-
-## Limitación técnica
-
-Netlify Blobs funciona como almacenamiento compartido simple. Para auditoría avanzada, historial de cambios o integración SSO institucional, conviene migrar luego a una base como Supabase/PostgreSQL o a un servidor institucional.
+Si la universidad necesita abrirlo en red interna para varios equipos, conviene definir antes una configuracion adicional de red y seguridad.

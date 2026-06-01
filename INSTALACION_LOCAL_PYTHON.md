@@ -1,6 +1,6 @@
 # Instalacion local Python
 
-Esta version permite ejecutar la app en un computador local de la universidad sin Node, Netlify ni internet.
+Esta version permite ejecutar la app en un computador local de la universidad sin Node, servicios externos ni internet.
 
 ## Requisitos
 
@@ -21,7 +21,7 @@ iniciar_app_python.bat
 Opcion por consola:
 
 ```bat
-py -3 local_server.py
+python local_server.py
 ```
 
 Luego abrir:
@@ -40,10 +40,6 @@ Cambiar.2026!
 Tutor ejemplo:
 fernando.garcia@ucentral.cl
 Tutor.2026!
-
-Cafe Digital:
-cafe.digital@ucentral.cl
-Cafe.2026!
 ```
 
 ## Datos locales
@@ -61,7 +57,9 @@ local_data/state.json
 local_data/users.json
 ```
 
-Estos archivos guardan calendario, usuarios, fotos y contraseñas. Para respaldar la app basta copiar la carpeta completa, incluyendo `local_data`.
+Estos archivos guardan calendario, usuarios, fotos y contrasenas. Para respaldar la app basta copiar la carpeta completa, incluyendo `local_data`.
+
+`local_data` no se sube a GitHub para evitar publicar datos operativos.
 
 ## Reiniciar datos
 
