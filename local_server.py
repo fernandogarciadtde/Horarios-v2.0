@@ -28,6 +28,9 @@ def ensure_data() -> None:
     DATA_DIR.mkdir(exist_ok=True)
     if not USERS_FILE.exists():
         write_json(USERS_FILE, create_default_users())
+    else:
+        users = [user for user in read_json(USERS_FILE) if user.get("role") != "cafe_digital" and user.get("id") != "cafe-digital"]
+        write_json(USERS_FILE, users)
     if not STATE_FILE.exists():
         write_json(STATE_FILE, create_default_state())
 
@@ -95,7 +98,6 @@ def create_default_users() -> list[dict]:
         make_user("tutor-fernando", "Fernando Garc\u00eda", "fernando.garcia@ucentral.cl", "tutor", "Tutor.2026!"),
         make_user("tutor-denisse-bravo", "Denisse Bravo", "denisse.bravo@ucentral.cl", "tutor", "Tutor.2026!"),
         make_user("tutor-denisse-rossel", "Denisse Rossel", "denisse.rossel@ucentral.cl", "tutor", "Tutor.2026!"),
-        make_user("cafe-digital", "Caf\u00e9 Digital", "cafe.digital@ucentral.cl", "cafe_digital", "Cafe.2026!"),
     ]
 
 

@@ -13,8 +13,8 @@ exports.handler = async (event) => {
   if (event.httpMethod === "POST") {
     if (user.role !== "admin") return json(403, { error: "Permiso de administrador requerido." });
     const body = JSON.parse(event.body || "{}");
-    if (!body.userId || !body.newPassword) return json(400, { error: "Falta usuario o contrasena." });
-    if (String(body.newPassword).length < 8) return json(400, { error: "La nueva contrasena debe tener al menos 8 caracteres." });
+    if (!body.userId || !body.newPassword) return json(400, { error: "Falta usuario o contraseña." });
+    if (String(body.newPassword).length < 8) return json(400, { error: "La nueva contraseña debe tener al menos 8 caracteres." });
     const users = await readUsers();
     const target = users.find((candidate) => candidate.id === body.userId);
     if (!target) return json(404, { error: "Usuario no encontrado." });

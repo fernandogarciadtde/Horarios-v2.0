@@ -15,6 +15,7 @@ const monthNames = [
 ];
 
 const options = {
+  assign: { shift: null, mode: "pending", label: "Asignar", code: "ASIGNAR", className: "status-assign" },
   "A-onsite": { shift: "A", mode: "onsite", label: "Turno A presencial", code: "A", className: "status-onsite" },
   "B-onsite": { shift: "B", mode: "onsite", label: "Turno B presencial", code: "B", className: "status-onsite" },
   "A-remote": { shift: "A", mode: "remote", label: "Turno A remoto", code: "A-R", className: "status-remote" },
@@ -40,14 +41,20 @@ let users = [];
 let selectedResetUserId = null;
 let calendarViewMode = "month";
 let selectedWeekKey = "";
+let currentPage = "calendar";
+let showWeeklyNotifications = true;
+const undoHistory = [];
 const collapsedWeeks = new Set();
 const maxPhotoSize = 240;
 
 const el = {
   appShell: document.querySelector("#appShell"),
+  adminShell: document.querySelector("#adminShell"),
   sessionAvatar: document.querySelector("#sessionAvatar"),
   sessionRole: document.querySelector("#sessionRole"),
   sessionName: document.querySelector("#sessionName"),
+  adminNavBtn: document.querySelector("#adminNavBtn"),
+  calendarNavBtn: document.querySelector("#calendarNavBtn"),
   profilePhotoInput: document.querySelector("#profilePhotoInput"),
   profilePhotoBtn: document.querySelector("#profilePhotoBtn"),
   passwordBtn: document.querySelector("#passwordBtn"),
@@ -57,8 +64,6 @@ const el = {
   newPasswordInput: document.querySelector("#newPasswordInput"),
   passwordMessage: document.querySelector("#passwordMessage"),
   savePasswordBtn: document.querySelector("#savePasswordBtn"),
-  usersPanel: document.querySelector("#usersPanel"),
-  usersList: document.querySelector("#usersList"),
   resetPasswordDialog: document.querySelector("#resetPasswordDialog"),
   resetPasswordTitle: document.querySelector("#resetPasswordTitle"),
   adminPasswordInput: document.querySelector("#adminPasswordInput"),
@@ -70,7 +75,6 @@ const el = {
   weekSelect: document.querySelector("#weekSelect"),
   weekSelectLabel: document.querySelector("#weekSelectLabel"),
   generateBtn: document.querySelector("#generateBtn"),
-  exportBtn: document.querySelector("#exportBtn"),
   resetBtn: document.querySelector("#resetBtn"),
   addAgentBtn: document.querySelector("#addAgentBtn"),
   agentsList: document.querySelector("#agentsList"),
@@ -165,6 +169,15 @@ function bindAccountEvents() {
   el.saveResetPasswordBtn.addEventListener("click", saveAdminResetPassword);
   el.profilePhotoBtn?.addEventListener("click", () => el.profilePhotoInput?.click());
   el.profilePhotoInput?.addEventListener("change", saveCurrentUserPhoto);
+  el.adminNavBtn?.addEventListener("click", () => {
+    if (!canEdit()) return;
+    currentPage = "admin";
+    render();
+  });
+  el.calendarNavBtn?.addEventListener("click", () => {
+    currentPage = "calendar";
+    render();
+  });
 
   el.logoutBtn.addEventListener("click", async () => {
     await fetch("/api/logout", { method: "POST" });
@@ -181,11 +194,14 @@ function redirectToLogin() {
 
 function showApp() {
   const editable = canEdit();
-  el.appShell.hidden = false;
+  if (!editable && currentPage === "admin") currentPage = "calendar";
+  el.appShell.hidden = currentPage !== "calendar";
+  if (el.adminShell) el.adminShell.hidden = currentPage !== "admin" || !editable;
   el.appShell.classList.toggle("readonly", !editable);
   el.sessionName.textContent = currentUser?.name || "Usuario";
   el.sessionRole.textContent = roleLabel(currentUser?.role);
   if (el.sessionAvatar) el.sessionAvatar.innerHTML = avatarContentHtml(currentProfilePerson());
+  if (el.adminNavBtn) el.adminNavBtn.hidden = !editable;
   if (el.profilePhotoBtn) el.profilePhotoBtn.hidden = !canEditProfilePhoto();
   if (el.profilePhotoInput) el.profilePhotoInput.disabled = !canEditProfilePhoto();
   el.adminOnly.forEach((node) => {
@@ -217,7 +233,6 @@ function roleLabel(role) {
   const labels = {
     admin: "Administrador",
     tutor: "Tutor",
-    cafe_digital: "Café Digital",
   };
   return labels[role] || "Consulta";
 }
@@ -227,11 +242,13 @@ function bindEvents() {
   eventsBound = true;
   el.monthSelect.addEventListener("change", () => {
     if (!canEdit()) return;
+    pushUndoSnapshot();
     state.month = Number(el.monthSelect.value);
     generateSchedule();
   });
   el.yearInput.addEventListener("change", () => {
     if (!canEdit()) return;
+    pushUndoSnapshot();
     state.year = Number(el.yearInput.value);
     generateSchedule();
   });
@@ -243,11 +260,11 @@ function bindEvents() {
     selectedWeekKey = el.weekSelect.value;
     render();
   });
-  el.generateBtn.addEventListener("click", generateSchedule);
-  el.exportBtn.addEventListener("click", exportExcel);
+  el.generateBtn?.addEventListener("click", generateSchedule);
   el.resetBtn.addEventListener("click", async () => {
     if (!canEdit()) return;
     if (!confirm("¿Restaurar agentes y configuración inicial?")) return;
+    pushUndoSnapshot();
     const response = await fetch("/api/reset-state", { method: "POST" });
     const payload = await response.json();
     state = payload.state;
@@ -255,6 +272,7 @@ function bindEvents() {
   });
   el.addAgentBtn.addEventListener("click", () => {
     if (!canEdit()) return;
+    pushUndoSnapshot();
     state.agents.push({ id: crypto.randomUUID(), name: "Nuevo agente", order: state.agents.length, photo: "" });
     generateSchedule();
   });
@@ -316,15 +334,16 @@ async function saveAdminResetPassword(event) {
   }
   await loadUsers();
   el.resetPasswordDialog.close();
-  renderUsers();
+  renderAgents();
 }
 
-function generateSchedule() {
+function generateSchedule(onlyWeekKey = null) {
   if (!canEdit()) return;
+  if (typeof onlyWeekKey !== "string") onlyWeekKey = null;
   const previousSchedule = state.schedule || {};
   const weeks = getMonthWeeks(state.year, state.month);
   const schedule = {};
-  const fridayB = new Set();
+  const fridayB = new Map(state.agents.map((agent) => [agent.id, 0]));
 
   weeks.forEach((week, weekIndex) => {
     const weekKey = dateKey(week[0]);
@@ -338,15 +357,16 @@ function generateSchedule() {
         const recurringLock = state.recurringLocks.find((lock) => lock.agentId === agent.id && lock.day === isoDay(date));
         let cell = { status: "A-onsite", locked: false, note: "" };
 
-        if (special?.type === "mandatory") cell = { status: "A-onsite", locked: true, note: "Asistencia obligatoria" };
+        if (special?.type === "mandatory" && absence?.type === "medical") cell = { status: "medical", locked: true, note: absenceLabel("medical") };
+        else if (special?.type === "mandatory") cell = { status: "A-onsite", locked: true, note: "Asistencia obligatoria" };
         else if (isClosedSpecial(special)) cell = { status: special.type, locked: true, note: specialLabel(special.type) };
         else if (absence) cell = { status: absence.type, locked: true, note: absenceLabel(absence.type) };
-        else if (recurringLock?.mode === "remote") cell = { status: "A-remote", locked: true, note: "Bloqueo recurrente" };
-        else if (recurringLock?.mode === "onsite") cell = { status: "A-onsite", locked: true, note: "Bloqueo recurrente" };
+        else if (recurringLock) cell = { status: recurringLockStatus(recurringLock), locked: true, note: "Bloqueo recurrente" };
         schedule[weekKey][agent.id][key] = cell;
       });
     });
 
+    balanceMandatoryDayShifts(schedule, weekKey, week, weekIndex);
     const friday = week.find((date) => isoDay(date) === 5);
     if (friday) assignMonthlyFridayB(schedule, weekKey, friday, fridayB, weekIndex);
     state.agents.forEach((agent, agentIndex) => assignWeeklyB(schedule, weekKey, week, agent, agentIndex, weekIndex));
@@ -363,6 +383,13 @@ function generateSchedule() {
   balanceMonthlyFridayB(schedule);
   fillWeeklyRemoteTargets(schedule);
   rebalanceWeeklyTargets(schedule);
+  ensureMinimumDailyRemote(schedule);
+
+  if (onlyWeekKey) {
+    Object.entries(previousSchedule).forEach(([weekKey, weekByAgent]) => {
+      if (weekKey !== onlyWeekKey) schedule[weekKey] = weekByAgent;
+    });
+  }
 
   lockExpiredDays(schedule, previousSchedule);
 
@@ -373,23 +400,46 @@ function generateSchedule() {
 
 function assignMonthlyFridayB(schedule, weekKey, friday, fridayB, weekIndex) {
   const dayKey = dateKey(friday);
-  const candidates = activeAgentsForDay(schedule, weekKey, dayKey).filter((agent) => !fridayB.has(agent.id));
+  const activeAgents = activeAgentsForDay(schedule, weekKey, dayKey);
+  if (!activeAgents.length) return;
+  const minFridayB = Math.min(...activeAgents.map((agent) => fridayB.get(agent.id) || 0));
+  const candidates = activeAgents.filter((agent) => (fridayB.get(agent.id) || 0) === minFridayB);
   if (!candidates.length) return;
   const target = candidates[weekIndex % candidates.length];
   setShift(schedule[weekKey][target.id][dayKey], "B");
   setMode(schedule[weekKey][target.id][dayKey], "onsite");
-  fridayB.add(target.id);
+  fridayB.set(target.id, (fridayB.get(target.id) || 0) + 1);
 }
 
 function applyManualOverrides(schedule) {
   Object.entries(state.manualOverrides || {}).forEach(([key, override]) => {
     const [weekKey, agentId, dayKey] = key.split("|");
     if (isExpiredDay(dayKey)) return;
-    if (specialFor(dayKey)?.type === "mandatory") return;
+    const special = specialFor(dayKey);
+    const source = override.source || (override.note === "Bloqueo manual" ? "future-lock" : "manual");
+    if (special && override.status === "assign") return;
+    if (special && source === "future-lock" && override.status !== "medical") return;
     if (schedule[weekKey]?.[agentId]?.[dayKey]) {
-      schedule[weekKey][agentId][dayKey] = { ...schedule[weekKey][agentId][dayKey], ...override };
+      schedule[weekKey][agentId][dayKey] = { ...schedule[weekKey][agentId][dayKey], ...mandatoryOverride(special, override) };
     }
   });
+}
+
+function mandatoryOverride(special, override) {
+  if (special?.type !== "mandatory" || override.status === "medical") return override;
+  const shift = getShift({ status: override.status }) || "A";
+  return {
+    ...override,
+    status: `${shift}-onsite`,
+    locked: true,
+    note: "Asistencia obligatoria",
+  };
+}
+
+function recurringLockStatus(lock) {
+  if (lock?.mode === "remote") return "A-remote";
+  if (lock?.mode === "onsite") return "A-onsite";
+  return options[lock?.mode] ? lock.mode : "A-onsite";
 }
 
 function assignWeeklyB(schedule, weekKey, week, agent, agentIndex, weekIndex) {
@@ -428,26 +478,20 @@ function assignWeeklyRemote(schedule, weekKey, week, agent, agentIndex, weekInde
 }
 
 function weeklyRemoteTarget(schedule, weekKey, week, agentId, weekIndex) {
-  const workDays = week.filter((date) => isEditableWorkCell(schedule[weekKey]?.[agentId]?.[dateKey(date)])).length;
-  if (!workDays) return 0;
-  const activeAgentIds = state.agents
-    .filter((agent) => week.some((date) => isEditableWorkCell(schedule[weekKey]?.[agent.id]?.[dateKey(date)])))
-    .map((agent) => agent.id);
-  const weeklyCapacity = week.reduce((sum, date) => {
-    const dayKey = dateKey(date);
-    return sum + dailyRemoteCapacity(schedule, weekKey, dayKey);
-  }, 0);
-  const maxDesired = activeAgentIds.reduce((sum, id) => {
-    const days = week.filter((date) => isEditableWorkCell(schedule[weekKey]?.[id]?.[dateKey(date)])).length;
-    return sum + Math.min(2, days);
-  }, 0);
-  if (weeklyCapacity >= maxDesired) return Math.min(2, workDays);
-  const agentPosition = activeAgentIds.indexOf(agentId);
-  if (agentPosition < 0) return 0;
-  const base = Math.floor(weeklyCapacity / activeAgentIds.length);
-  const extra = weeklyCapacity % activeAgentIds.length;
-  const rotationPosition = (agentPosition + weekIndex) % activeAgentIds.length;
-  return Math.min(2, workDays, base + (rotationPosition < extra ? 1 : 0));
+  const remoteEligibleDays = week.filter((date) => {
+    const cell = schedule[weekKey]?.[agentId]?.[dateKey(date)];
+    return isEditableWorkCell(cell) && cell.note !== "Asistencia obligatoria";
+  }).length;
+  if (!remoteEligibleDays) return 0;
+  if (weeklyOperationalDays(week) <= 3) return Math.min(1, remoteEligibleDays);
+  return Math.min(2, remoteEligibleDays);
+}
+
+function weeklyOperationalDays(week) {
+  return week.filter((date) => {
+    const special = specialFor(dateKey(date));
+    return !isClosedSpecial(special);
+  }).length;
 }
 
 function dailyRemoteCapacity(schedule, weekKey, dayKey) {
@@ -478,46 +522,7 @@ function hasRemoteCapacityForDay(schedule, weekKey, dayKey, nextRemoteAgentId) {
 }
 
 function balanceMonthlyFridayB(schedule) {
-  const weeks = getMonthWeeks(state.year, state.month);
-  const monthFridayWeeks = weeks.filter((week) => {
-    const friday = week.find((date) => isoDay(date) === 5 && date.getMonth() === state.month);
-    return Boolean(friday);
-  });
-  state.agents.forEach((agent) => {
-    const fridayBWeeks = monthFridayWeeks.filter((week) => {
-      const friday = week.find((date) => isoDay(date) === 5 && date.getMonth() === state.month);
-      return friday && isOnsiteShift(schedule[dateKey(week[0])]?.[agent.id]?.[dateKey(friday)], "B");
-    });
-
-    fridayBWeeks.slice(1).forEach((week) => {
-      const weekKey = dateKey(week[0]);
-      const friday = week.find((date) => isoDay(date) === 5 && date.getMonth() === state.month);
-      const fridayKey = dateKey(friday);
-      const fridayCell = schedule[weekKey]?.[agent.id]?.[fridayKey];
-      if (!canAdjustWorkCell(fridayCell)) return;
-      setShift(fridayCell, "A");
-    });
-
-    if (fridayBWeeks.length) return;
-
-    for (const week of monthFridayWeeks) {
-      const weekKey = dateKey(week[0]);
-      const friday = week.find((date) => isoDay(date) === 5 && date.getMonth() === state.month);
-      if (!friday) continue;
-      const fridayKey = dateKey(friday);
-      const fridayCell = schedule[weekKey]?.[agent.id]?.[fridayKey];
-      if (!canAdjustWorkCell(fridayCell)) continue;
-
-      setShift(fridayCell, "B");
-      setMode(fridayCell, "onsite");
-      const extraB = week
-        .filter((date) => isoDay(date) !== 5)
-        .map((date) => schedule[weekKey][agent.id][dateKey(date)])
-        .find((cell) => isWorkShift(cell, "B") && canAdjustWorkCell(cell));
-      if (extraB) setShift(extraB, "A");
-      break;
-    }
-  });
+  return schedule;
 }
 
 function balanceAllDailyShiftDistribution(schedule) {
@@ -564,6 +569,25 @@ function balanceDailyShiftDistribution(schedule, weekKey, week, weekIndex) {
       setShift(candidate.cell, "A");
       bCount -= 1;
     }
+  });
+}
+
+function balanceMandatoryDayShifts(schedule, weekKey, week, weekIndex) {
+  week.forEach((date) => {
+    const dayKey = dateKey(date);
+    if (specialFor(dayKey)?.type !== "mandatory") return;
+    const cells = state.agents
+      .map((agent, agentIndex) => ({ agent, agentIndex, cell: schedule[weekKey]?.[agent.id]?.[dayKey] }))
+      .filter(({ cell }) => cell?.note === "Asistencia obligatoria" && isEditableWorkCell(cell));
+    if (cells.length < 2) return;
+    cells
+      .sort((a, b) => rotationScore(date, a.agentIndex, weekIndex, "B") - rotationScore(date, b.agentIndex, weekIndex, "B"))
+      .forEach((item, index) => {
+        const shift = index < Math.floor(cells.length / 2) ? "B" : "A";
+        item.cell.status = `${shift}-onsite`;
+        item.cell.locked = true;
+        item.cell.note = "Asistencia obligatoria";
+      });
   });
 }
 
@@ -634,6 +658,36 @@ function rebalanceWeeklyTargets(schedule) {
   });
 }
 
+function ensureMinimumDailyRemote(schedule) {
+  getMonthWeeks(state.year, state.month).forEach((week, weekIndex) => {
+    const weekKey = dateKey(week[0]);
+    week.forEach((date) => {
+      const dayKey = dateKey(date);
+      const special = specialFor(dayKey);
+      if (isExpiredDay(dayKey) || special?.type === "mandatory" || isClosedSpecial(special)) return;
+      const activeCells = state.agents
+        .map((agent, agentIndex) => ({ agent, agentIndex, cell: schedule[weekKey]?.[agent.id]?.[dayKey] }))
+        .filter(({ cell }) => isEditableWorkCell(cell));
+      if (activeCells.length < 2 || activeCells.some(({ cell }) => getMode(cell) === "remote")) return;
+      const candidate = activeCells
+        .filter(({ agent, cell }) => {
+          if (!canAdjustWorkCell(cell)) return false;
+          if (!hasRemoteCapacityForDay(schedule, weekKey, dayKey, agent.id)) return false;
+          return canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agent.id, getShift(cell), "remote", isUnionStatus(cell));
+        })
+        .sort((a, b) => {
+          const aRemote = weeklyRemoteCount(schedule, weekKey, week, a.agent.id);
+          const bRemote = weeklyRemoteCount(schedule, weekKey, week, b.agent.id);
+          if (aRemote !== bRemote) return aRemote - bRemote;
+          return rotationScore(date, a.agentIndex, weekIndex, getShift(a.cell)) - rotationScore(date, b.agentIndex, weekIndex, getShift(b.cell));
+        })[0];
+      if (!candidate) return;
+      setMode(candidate.cell, "remote");
+      candidate.cell.note = candidate.cell.note || "Ajuste por remoto diario";
+    });
+  });
+}
+
 function rebalanceDailyRemoteShifts(schedule, weekKey, week) {
   week.forEach((date) => {
     const dayKey = dateKey(date);
@@ -675,6 +729,10 @@ function canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agentId, nex
 
 function weeklyShiftCount(schedule, weekKey, week, agentId, shift) {
   return week.filter((date) => isWorkShift(schedule[weekKey]?.[agentId]?.[dateKey(date)], shift)).length;
+}
+
+function weeklyRemoteCount(schedule, weekKey, week, agentId) {
+  return week.filter((date) => getMode(schedule[weekKey]?.[agentId]?.[dateKey(date)]) === "remote").length;
 }
 
 function weeklyBRange(schedule, weekKey, week) {
@@ -840,7 +898,6 @@ function render() {
   renderSelectors();
   renderAgents();
   renderLists();
-  renderUsers();
   renderCalendar();
   renderRules();
   saveState();
@@ -849,7 +906,7 @@ function render() {
 function renderSelectors() {
   const lockValue = el.lockAgentInput.value;
   const absenceValue = el.absenceAgentInput.value;
-  const weeks = getMonthWeeks(state.year, state.month);
+  const weeks = selectableWeeks();
   const weekKeys = weeks.map((week) => dateKey(week[0]));
   if (!weekKeys.includes(selectedWeekKey)) selectedWeekKey = defaultSelectedWeekKey(weeks);
   renderViewModeOptions();
@@ -879,14 +936,19 @@ function renderSelectors() {
 }
 
 function renderViewModeOptions() {
-  const modes = [
-    ["month", "Todo el mes"],
-    ["week", "Solo la semana"],
-  ];
-  if (currentUser?.role === "tutor") {
+  const modes = isTutorLimitedView()
+    ? [
+        ["my-week", "Mis turnos semanales"],
+        ["week", "Solo la semana"],
+      ]
+    : [
+        ["month", "Todo el mes"],
+        ["week", "Solo la semana"],
+      ];
+  if (!isTutorLimitedView() && currentUser?.role === "tutor") {
     modes.push(["my-week", "Mis turnos semanales"], ["my-month", "Mis turnos mensuales"]);
   }
-  if (!modes.some(([value]) => value === calendarViewMode)) calendarViewMode = "month";
+  if (!modes.some(([value]) => value === calendarViewMode)) calendarViewMode = isTutorLimitedView() ? "my-week" : "month";
   el.calendarViewMode.innerHTML = "";
   modes.forEach(([value, label]) => {
     const option = document.createElement("option");
@@ -899,6 +961,7 @@ function renderViewModeOptions() {
 function renderAgents() {
   el.agentsList.innerHTML = "";
   state.agents.forEach((agent) => {
+    const linkedUser = userForAgent(agent);
     const row = document.createElement("div");
     row.className = "agent-row";
     const avatar = document.createElement("div");
@@ -911,9 +974,15 @@ function renderAgents() {
     input.disabled = !canEdit();
     input.addEventListener("change", () => {
       if (!canEdit()) return;
+      pushUndoSnapshot();
       agent.name = input.value.trim() || "Agente sin nombre";
       generateSchedule();
     });
+    const meta = document.createElement("small");
+    meta.className = "agent-meta";
+    meta.textContent = linkedUser
+      ? `${linkedUser.email}${linkedUser.mustChangePassword ? " | cambio pendiente" : ""}`
+      : "Sin usuario asociado";
     const photoInput = document.createElement("input");
     photoInput.type = "file";
     photoInput.accept = "image/*";
@@ -922,6 +991,7 @@ function renderAgents() {
     photoInput.addEventListener("change", async () => {
       if (!canEdit() || !photoInput.files?.[0]) return;
       try {
+        pushUndoSnapshot();
         agent.photo = await resizePhoto(photoInput.files[0]);
         saveState();
         render();
@@ -940,6 +1010,7 @@ function renderAgents() {
     clearPhoto.disabled = !canEdit() || !agent.photo;
     clearPhoto.addEventListener("click", () => {
       if (!canEdit()) return;
+      pushUndoSnapshot();
       agent.photo = "";
       saveState();
       render();
@@ -950,45 +1021,54 @@ function renderAgents() {
     remove.disabled = !canEdit();
     remove.addEventListener("click", () => {
       if (!canEdit()) return;
+      pushUndoSnapshot();
       state.agents = state.agents.filter((item) => item.id !== agent.id);
       generateSchedule();
     });
-    row.append(avatar, input, photoInput, photoButton, clearPhoto, remove);
+    const resetPassword = document.createElement("button");
+    resetPassword.className = "mini-button reset-password-button";
+    resetPassword.textContent = "Resetear contraseña";
+    resetPassword.disabled = !canEdit() || !linkedUser;
+    resetPassword.addEventListener("click", () => {
+      if (!linkedUser) return;
+      openResetPassword(linkedUser.id);
+    });
+    row.append(avatar, input, meta, photoInput, photoButton, clearPhoto, resetPassword, remove);
     el.agentsList.append(row);
   });
 }
 
+function userForAgent(agent) {
+  if (!agent) return null;
+  if (agent.userId) {
+    const linked = users.find((user) => user.id === agent.userId);
+    if (linked) return linked;
+  }
+  const matched = users.find((user) => user.role === "tutor" && normalizeName(user.name) === normalizeName(agent.name));
+  if (matched && !agent.userId) agent.userId = matched.id;
+  return matched || null;
+}
+
 function renderLists() {
-  renderSimpleList(el.specialDaysList, state.specialDays, (item) => {
-    const label = specialLabel(item.type);
-    return `<strong>${formatDate(item.date)}</strong><small>${label}</small>`;
-  });
+  renderSimpleList(
+    el.specialDaysList,
+    state.specialDays,
+    (item) => {
+      const label = specialLabel(item.type);
+      return `<strong>${formatDate(item.date)}</strong><small>${label}</small>`;
+    },
+    (item) => item.type !== "holiday",
+  );
   renderSimpleList(el.locksList, state.recurringLocks, (item) => {
     const agent = state.agents.find((candidate) => candidate.id === item.agentId);
-    return `<strong>${agent?.name || "Agente eliminado"}</strong><small>${dayNames[item.day - 1]} | ${item.mode === "remote" ? "Remoto" : "Presencial"}</small>`;
+    const lockOption = options[recurringLockStatus(item)] || options["A-onsite"];
+    return `<strong>${agent?.name || "Agente eliminado"}</strong><small>${dayNames[item.day - 1]} | ${lockOption.label}</small>`;
   });
   renderSimpleList(el.absencesList, state.absences, (item) => {
     const agent = state.agents.find((candidate) => candidate.id === item.agentId);
     const type = absenceLabel(item.type);
     const to = item.indefinite ? "indefinida" : formatDate(item.to);
     return `<strong>${agent?.name || "Agente eliminado"}</strong><small>${type} | ${formatDate(item.from)} a ${to}</small>`;
-  });
-}
-
-function renderUsers() {
-  if (!el.usersList || !canEdit()) return;
-  el.usersList.innerHTML = "";
-  users.forEach((user) => {
-    const row = document.createElement("div");
-    row.className = "list-row";
-    const text = document.createElement("div");
-    text.innerHTML = `<strong>${escapeHtml(user.name)}</strong><small>${escapeHtml(roleLabel(user.role))} | ${escapeHtml(user.email)}${user.mustChangePassword ? " | cambio pendiente" : ""}</small>`;
-    const reset = document.createElement("button");
-    reset.className = "mini-button";
-    reset.textContent = "Reset";
-    reset.addEventListener("click", () => openResetPassword(user.id));
-    row.append(text, reset);
-    el.usersList.append(row);
   });
 }
 
@@ -1016,11 +1096,11 @@ async function saveUserPhoto(userId, photo) {
   }
   users = users.map((user) => (user.id === userId ? payload.user : user));
   if (currentUser?.id === userId) currentUser = payload.user;
-  renderUsers();
+  renderAgents();
   showApp();
 }
 
-function renderSimpleList(container, list, labeler) {
+function renderSimpleList(container, list, labeler, canRemoveItem = () => true) {
   container.innerHTML = "";
   list
     .slice()
@@ -1032,8 +1112,9 @@ function renderSimpleList(container, list, labeler) {
       text.innerHTML = labeler(item);
       const remove = document.createElement("button");
       remove.className = "mini-button";
-      remove.textContent = "Quitar";
-      remove.disabled = !canEdit();
+      const removable = canRemoveItem(item);
+      remove.textContent = removable ? "Quitar" : "Fijo";
+      remove.disabled = !canEdit() || !removable;
       remove.addEventListener("click", () => {
         removeItem(item.id);
       });
@@ -1046,6 +1127,7 @@ function renderCalendar() {
   el.calendarView.innerHTML = "";
   const agents = visibleAgents();
   const weeklyIssues = weeklyRuleIssues();
+  const weeklyNotifications = weeklyRuleNotifications();
   if (!agents.length) {
     el.calendarView.innerHTML = `<article class="week-block empty-view"><p>No hay turnos personales asociados a este usuario.</p></article>`;
     return;
@@ -1062,10 +1144,12 @@ function renderCalendar() {
         <h3>Semana ${formatDate(weekKey)}</h3>
         <div class="week-actions">
           <span>${shiftSummaryText()}</span>
+          <button class="week-export-pdf export-hidden" type="button">PDF</button>
           ${canCollapse ? `<button class="week-toggle" type="button">${collapsed ? "Expandir" : "Colapsar"}</button>` : ""}
         </div>
       </div>
     `;
+    block.querySelector(".week-export-pdf")?.addEventListener("click", () => exportWeekPdf(block, weekKey));
     const toggle = block.querySelector(".week-toggle");
     toggle?.addEventListener("click", () => {
       if (collapsedWeeks.has(weekKey)) collapsedWeeks.delete(weekKey);
@@ -1074,16 +1158,44 @@ function renderCalendar() {
     });
     const body = document.createElement("div");
     body.className = "week-body";
+    const weekMain = document.createElement("div");
+    weekMain.className = "week-main";
+    if (canEdit()) weekMain.classList.add("with-issues");
+    const tableWrap = document.createElement("div");
+    tableWrap.className = "week-table-wrap";
+    const issueColumn = document.createElement("aside");
+    issueColumn.className = "week-issues-column";
     const issues = weeklyIssues.get(weekKey) || [];
-    if (canEdit() && issues.length) {
-      const issueBox = document.createElement("section");
-      issueBox.className = "week-issues";
-      issueBox.innerHTML = `
+    const notifications = weeklyNotifications.get(weekKey) || [];
+    issueColumn.innerHTML = canEdit()
+      ? `
         <p class="rule-message"><strong>Incongruencias de la semana:</strong></p>
-        ${issues.map((issue) => `<p class="rule-message">• ${escapeHtml(issue)}</p>`).join("")}
-      `;
-      body.append(issueBox);
-    }
+        ${
+          issues.length
+            ? issues.map((issue) => `<p class="rule-message">• ${escapeHtml(issue)}</p>`).join("")
+            : '<p class="rule-message">Sin incongruencias.</p>'
+        }
+        ${
+          showWeeklyNotifications && notifications.length
+            ? `
+              <div class="week-notifications">
+                <p class="rule-message"><strong>Notificaciones:</strong></p>
+                ${notifications.map((notification) => `<p class="rule-message">• ${escapeHtml(notification)}</p>`).join("")}
+              </div>
+            `
+            : ""
+        }
+        <button class="week-notification-toggle" type="button">${showWeeklyNotifications ? "Ocultar notificaciones" : "Mostrar notificaciones"}</button>
+        <button class="week-undo" type="button"${undoHistory.length ? "" : " disabled"}>Deshacer último cambio</button>
+        <button class="week-reset" type="button">Resetear semana</button>
+      `
+      : "";
+    issueColumn.querySelector(".week-notification-toggle")?.addEventListener("click", () => {
+      showWeeklyNotifications = !showWeeklyNotifications;
+      renderCalendar();
+    });
+    issueColumn.querySelector(".week-undo")?.addEventListener("click", undoLastChange);
+    issueColumn.querySelector(".week-reset")?.addEventListener("click", () => resetWeek(weekKey, week));
     const table = document.createElement("table");
     table.className = "schedule-table";
     table.innerHTML = `
@@ -1106,12 +1218,14 @@ function renderCalendar() {
         const td = document.createElement("td");
         const button = document.createElement("button");
         const expired = isExpiredDay(key);
+        const displayLabel = cell.note === "Asistencia obligatoria" ? "Asistencia obligatoria" : option.label;
+        const showLabel = cell.status !== "holiday";
+        const showLockedMark = (expired || cell.note === "Bloqueo recurrente" || cell.note === "Bloqueo manual") && !isClosedCell(cell);
         button.className = `cell-btn ${option.className}${cell.note === "Asistencia obligatoria" ? " status-mandatory" : ""}${expired ? " expired-cell" : ""}`;
         button.disabled = expired || !canEdit();
         button.innerHTML = `
-          <strong>${option.code}${(cell.locked || expired) && !isClosedCell(cell) ? '<span class="locked-mark">Bloq.</span>' : ""}</strong>
-          <span>${option.label}</span>
-          ${expired ? `<span>Día vencido</span>` : cell.note ? `<span>${escapeHtml(cell.note)}</span>` : ""}
+          <strong>${option.code}${showLockedMark ? '<span class="locked-mark">Bloq.</span>' : ""}</strong>
+          ${showLabel ? `<span>${displayLabel}</span>` : ""}
         `;
         button.addEventListener("click", () => openCellEditor(weekKey, agent.id, key));
         td.append(button);
@@ -1119,17 +1233,33 @@ function renderCalendar() {
       });
       tbody.append(row);
     });
-    body.append(table);
+    tableWrap.append(table);
+    weekMain.append(tableWrap);
+    if (canEdit()) weekMain.append(issueColumn);
+    body.append(weekMain);
     block.append(body);
     el.calendarView.append(block);
   });
 }
 
 function visibleWeeks() {
-  const weeks = getMonthWeeks(state.year, state.month);
+  const weeks = selectableWeeks();
   if (!isWeeklyView()) return weeks;
   const weekKey = selectedWeekKey || defaultSelectedWeekKey(weeks);
   return weeks.filter((week) => dateKey(week[0]) === weekKey);
+}
+
+function selectableWeeks() {
+  const weeks = getMonthWeeks(state.year, state.month);
+  if (!isTutorLimitedView()) return weeks;
+  const today = todayKey();
+  const currentIndex = weeks.findIndex((week) => week.some((date) => dateKey(date) === today));
+  if (currentIndex < 0) return weeks.slice(0, 2);
+  return weeks.slice(currentIndex, currentIndex + 2);
+}
+
+function isTutorLimitedView() {
+  return currentUser?.role === "tutor" && !canEdit();
 }
 
 function visibleAgents() {
@@ -1166,11 +1296,13 @@ function renderRules() {
     return;
   }
   const issues = validateRules();
+  const permanentMedical = permanentMedicalAgents();
   el.rulesPanel.className = `rules-panel ${issues.length ? "warn" : "ok"}`;
   el.rulesPanel.innerHTML = `
-    <p class="rule-message"><strong>Reglas vigentes:</strong> cada agente activo queda con hasta 2 dias remotos semanales segun dotacion disponible, idealmente con 1 remoto A y 1 remoto B por dia, turnos B balanceados por semana y 1 viernes B presencial mensual cuando hay disponibilidad.</p>
-    <p class="rule-message"><strong>Cobertura diaria:</strong> cada dia habil mantiene al menos un tutor presencial en turno A y uno presencial en turno B, respetando bloqueos y ausencias.</p>
-    <p class="rule-message"><strong>Salida sindicato:</strong> descuenta las ultimas dos horas de la jornada, pero cuenta dentro del total del turno y modalidad asignados.</p>
+    <p class="rule-message"><strong>Reglas vigentes:</strong> el cálculo se resuelve por semana; cada agente activo debe tener 2 remotos semanales, o 1 remoto cuando la semana queda con solo 3 días laborales. Los viernes B presenciales rotan por vuelta antes de volver a repetirse.</p>
+    <p class="rule-message"><strong>Cobertura diaria:</strong> cada día hábil mantiene al menos un tutor presencial en turno A y uno presencial en turno B, respetando bloqueos, ausencias y ajustes manuales.</p>
+    <p class="rule-message"><strong>Salida sindicato:</strong> descuenta las últimas dos horas de la jornada, pero cuenta dentro del total del turno y modalidad asignados.</p>
+    ${permanentMedical.length ? `<p class="rule-message"><strong>Estados permanentes:</strong> Licencia médica indefinida: ${permanentMedical.map((agent) => escapeHtml(agent.name)).join(", ")}.</p>` : ""}
     ${issues.length ? '<p class="rule-message"><strong>Incongruencias:</strong> revisa el detalle bajo cada semana desplegada.</p>' : ""}
   `;
 }
@@ -1189,6 +1321,7 @@ function weeklyRuleIssues() {
     const weekKey = dateKey(week[0]);
     const issues = [];
     state.agents.forEach((agent) => {
+      if (hasPermanentMedicalAbsence(agent.id)) return;
       const cells = week
         .map((date) => ({ date, key: dateKey(date), cell: state.schedule[weekKey]?.[agent.id]?.[dateKey(date)] }))
         .filter(({ cell, key }) => cell && !isExpiredDay(key));
@@ -1206,9 +1339,10 @@ function weeklyRuleIssues() {
         issues.push(`${agent.name}: tiene ${remote} remoto(s), deben ser ${remoteTarget}.`);
       }
       if (workCells.length >= 2 && (bShifts < bRange.min || bShifts > bRange.max)) {
-        issues.push(`${agent.name}: tiene ${bShifts} turno(s) B, deben estar entre ${bRange.min} y ${bRange.max}.`);
+        const expected = bRange.min === bRange.max ? `deben ser ${bRange.min}` : `deben estar entre ${bRange.min} y ${bRange.max}`;
+        issues.push(`${agent.name}: tiene ${bShifts} turno(s) B, ${expected}.`);
       }
-      if (workCells.length < 2 && unavailable > 0) {
+      if (workCells.length < 2 && unavailable > 0 && !hasPermanentMedicalAbsence(agent.id)) {
         issues.push(`${agent.name}: ausencia/feriado impide completar proporcionalidad semanal.`);
       }
       cells.forEach(({ date, cell }) => {
@@ -1220,38 +1354,102 @@ function weeklyRuleIssues() {
     week.forEach((date) => {
       const dayKey = dateKey(date);
       if (isExpiredDay(dayKey)) return;
+      if (specialFor(dayKey)?.type === "mandatory") return;
       const dayCells = state.agents.map((agent) => state.schedule[weekKey]?.[agent.id]?.[dayKey]).filter(Boolean);
       if (!dayCells.length || dayCells.every(isClosedCell)) return;
+      if (dayCells.some(isPendingCell)) return;
       const activeCells = dayCells.filter(isEditableWorkCell);
       const onsiteA = activeCells.some((cell) => getShift(cell) === "A" && getMode(cell) === "onsite");
       const onsiteB = activeCells.some((cell) => getShift(cell) === "B" && getMode(cell) === "onsite");
       const remoteA = activeCells.filter((cell) => getShift(cell) === "A" && getMode(cell) === "remote").length;
       const remoteB = activeCells.filter((cell) => getShift(cell) === "B" && getMode(cell) === "remote").length;
+      const remoteTotal = remoteA + remoteB;
       if (activeCells.length >= 2 && (!onsiteA || !onsiteB)) {
         issues.push(`${dayNames[isoDay(date) - 1]} ${formatDate(dayKey)}: debe haber al menos un tutor presencial en A y uno presencial en B.`);
       }
       if (remoteA > dailyRemoteShiftCapacity(state.schedule, weekKey, dayKey, "A") || remoteB > dailyRemoteShiftCapacity(state.schedule, weekKey, dayKey, "B")) {
-        issues.push(`${dayNames[isoDay(date) - 1]} ${formatDate(dayKey)}: los remotos deben distribuirse como maximo 1 en A y 1 en B.`);
+        issues.push(`${dayNames[isoDay(date) - 1]} ${formatDate(dayKey)}: los remotos deben distribuirse como máximo 1 en A y 1 en B.`);
+      }
+      if (activeCells.length >= 2 && remoteTotal === 0) {
+        issues.push(`${dayNames[isoDay(date) - 1]} ${formatDate(dayKey)}: debe existir al menos un tutor remoto si el día no está marcado como asistencia obligatoria, feriado o receso.`);
       }
       if (activeCells.length < 2) {
         issues.push(`${dayNames[isoDay(date) - 1]} ${formatDate(dayKey)}: no hay dotacion suficiente para cubrir A presencial y B presencial.`);
       }
     });
 
+    addShortDayDistributionIssues(issues, weekKey, week);
+
     if (issues.length) byWeek.set(weekKey, issues);
   });
 
-  state.agents.forEach((agent) => {
+  const activeFridayAgents = state.agents.filter((agent) => monthFridayWeek.has(agent.id));
+  const minFridayCount = activeFridayAgents.length ? Math.min(...activeFridayAgents.map((agent) => monthFridayB.get(agent.id) || 0)) : 0;
+  const maxFridayCount = minFridayCount < 2 ? 2 : minFridayCount + 1;
+  activeFridayAgents.forEach((agent) => {
     const fridayCount = monthFridayB.get(agent.id) || 0;
-    if (monthFridayWeek.has(agent.id) && fridayCount !== 1) {
+    if (fridayCount > maxFridayCount) {
       const weekKey = monthFridayWeek.get(agent.id);
       const issues = byWeek.get(weekKey) || [];
-      issues.push(`${agent.name}: tiene ${fridayCount} viernes B presencial durante ${monthNames[state.month]}, debe tener 1.`);
+      issues.push(`${agent.name}: tiene ${fridayCount} viernes B presencial durante ${monthNames[state.month]}; no debe volver a tocarle hasta que el resto complete la vuelta.`);
       byWeek.set(weekKey, issues);
     }
   });
 
   return byWeek;
+}
+
+function weeklyRuleNotifications() {
+  const byWeek = new Map();
+  getMonthWeeks(state.year, state.month).forEach((week) => {
+    const weekKey = dateKey(week[0]);
+    const notifications = [];
+    state.agents.forEach((agent) => {
+      week.forEach((date) => {
+        const dayKey = dateKey(date);
+        if (isExpiredDay(dayKey)) return;
+        const override = state.manualOverrides?.[`${weekKey}|${agent.id}|${dayKey}`];
+        const recurringLock = state.recurringLocks.find((lock) => lock.agentId === agent.id && lock.day === isoDay(date));
+        const overrideSource = override?.source || (override?.note === "Bloqueo manual" ? "future-lock" : "manual");
+        if (overrideSource === "manual" && recurringLock) {
+          notifications.push(`${agent.name}: turno desbloqueado manualmente el ${dayNames[isoDay(date) - 1]} ${formatDate(dayKey)}; el cálculo se ajusta al resto de la semana.`);
+        }
+      });
+    });
+    if (notifications.length) byWeek.set(weekKey, notifications);
+  });
+  return byWeek;
+}
+
+function permanentMedicalAgents() {
+  return state.agents.filter((agent) => hasPermanentMedicalAbsence(agent.id));
+}
+
+function hasPermanentMedicalAbsence(agentId) {
+  return state.absences.some((absence) => absence.agentId === agentId && absence.type === "medical" && absence.indefinite);
+}
+
+function isPendingCell(cell) {
+  return cell?.status === "assign";
+}
+
+function addShortDayDistributionIssues(issues, weekKey, week) {
+  const activeAgents = state.agents.filter((agent) => !hasPermanentMedicalAbsence(agent.id));
+  if (activeAgents.length < 2) return;
+  const counts = activeAgents.map((agent) => {
+    const shortRemote = week.filter((date) => {
+      if (isoDay(date) < 3) return false;
+      const cell = state.schedule[weekKey]?.[agent.id]?.[dateKey(date)];
+      return isEditableWorkCell(cell) && getMode(cell) === "remote";
+    }).length;
+    return { agent, shortRemote };
+  });
+  const values = counts.map((item) => item.shortRemote);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  if (max - min <= 1) return;
+  const detail = counts.map((item) => `${item.agent.name}: ${item.shortRemote}`).join(", ");
+  issues.push(`Miércoles a viernes: los remotos de jornada corta no están distribuidos equitativamente (${detail}).`);
 }
 
 function validateRules() {
@@ -1273,7 +1471,7 @@ function openCellEditor(weekKey, agentId, dayKey) {
   syncUnionOptions(agent.name);
   el.cellStatusInput.value = cell.status;
   if (isUnionStatus(cell) && !canUseUnion(agent.name)) el.cellStatusInput.value = stripUnionStatus(cell.status);
-  el.cellLockedInput.checked = Boolean(cell.locked);
+  if (el.cellLockedInput) el.cellLockedInput.checked = false;
   el.cellDialog.showModal();
 }
 
@@ -1289,16 +1487,17 @@ function saveCellEdit(event) {
     return;
   }
   const key = `${weekKey}|${agentId}|${dayKey}`;
+  pushUndoSnapshot();
+  const selectedStatus = specialFor(dayKey)?.type === "mandatory"
+    ? `${getShift({ status: el.cellStatusInput.value }) || "A"}-onsite`
+    : el.cellStatusInput.value;
   const override = {
-    status: el.cellStatusInput.value,
-    locked: el.cellLockedInput.checked,
-    note: el.cellLockedInput.checked ? "Bloqueo manual" : "",
+    status: selectedStatus,
+    locked: true,
+    note: specialFor(dayKey)?.type === "mandatory" ? "Asistencia obligatoria" : "Ajuste manual",
+    source: "manual",
   };
-  if (override.locked) {
-    applyManualLockToFutureWeeks(agentId, dayKey, override);
-  } else {
-    state.manualOverrides[key] = override;
-  }
+  state.manualOverrides[key] = override;
   el.cellDialog.close();
   generateSchedule();
 }
@@ -1342,6 +1541,7 @@ function stripUnionStatus(status) {
 function addSpecialDay() {
   if (!canEdit()) return;
   if (!el.specialDateInput.value) return;
+  pushUndoSnapshot();
   state.specialDays = state.specialDays.filter((item) => item.date !== el.specialDateInput.value);
   state.specialDays.push({ id: crypto.randomUUID(), date: el.specialDateInput.value, type: el.specialTypeInput.value });
   generateSchedule();
@@ -1350,6 +1550,7 @@ function addSpecialDay() {
 function addRecurringLock() {
   if (!canEdit()) return;
   if (!el.lockAgentInput.value) return;
+  pushUndoSnapshot();
   state.recurringLocks.push({
     id: crypto.randomUUID(),
     agentId: el.lockAgentInput.value,
@@ -1362,6 +1563,7 @@ function addRecurringLock() {
 function addAbsence() {
   if (!canEdit()) return;
   if (!el.absenceAgentInput.value || !el.absenceFromInput.value) return;
+  pushUndoSnapshot();
   const indefinite = el.absenceIndefInput.checked;
   state.absences.push({
     id: crypto.randomUUID(),
@@ -1376,10 +1578,54 @@ function addAbsence() {
 
 function removeItem(id) {
   if (!canEdit()) return;
+  if (state.specialDays.some((item) => item.id === id && item.type === "holiday")) return;
+  pushUndoSnapshot();
   state.specialDays = state.specialDays.filter((item) => item.id !== id);
   state.recurringLocks = state.recurringLocks.filter((item) => item.id !== id);
   state.absences = state.absences.filter((item) => item.id !== id);
   generateSchedule();
+}
+
+function pushUndoSnapshot() {
+  if (!state) return;
+  undoHistory.push(structuredClone(state));
+  if (undoHistory.length > 20) undoHistory.shift();
+}
+
+function undoLastChange() {
+  if (!canEdit() || !undoHistory.length) return;
+  state = undoHistory.pop();
+  saveState();
+  render();
+}
+
+function resetWeek(weekKey, week) {
+  if (!canEdit()) return;
+  pushUndoSnapshot();
+  week.forEach((date) => {
+    const dayKey = dateKey(date);
+    state.agents.forEach((agent) => {
+      const cell = state.schedule[weekKey]?.[agent.id]?.[dayKey];
+      if (!cell || isProtectedResetCell(cell)) return;
+      const overrideKey = `${weekKey}|${agent.id}|${dayKey}`;
+      const resetCell = { status: "assign", locked: false, note: "", source: "manual" };
+      state.schedule[weekKey][agent.id][dayKey] = { ...resetCell };
+      state.manualOverrides[overrideKey] = { ...resetCell };
+    });
+  });
+  saveState();
+  render();
+}
+
+function isProtectedResetCell(cell) {
+  return (
+    cell.status === "medical" ||
+    isClosedCell(cell) ||
+    cell.note === "Asistencia obligatoria" ||
+    cell.note === "Bloqueo recurrente" ||
+    cell.note === "Bloqueo manual" ||
+    cell.expired
+  );
 }
 
 function exportExcel() {
@@ -1391,6 +1637,71 @@ function exportExcel() {
   link.download = `Horario_Service_Desk_${exportScopeName()}_${String(state.month + 1).padStart(2, "0")}-${state.year}.xlsx`;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function exportWeekPdf(weekBlock, weekKey) {
+  const exportNode = buildWeekExportNode(weekBlock);
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    showRulesError("El navegador bloqueó la ventana de PDF. Permite ventanas emergentes para exportar.");
+    return;
+  }
+  printWindow.document.write(`
+    <!doctype html>
+    <html lang="es">
+      <head>
+        <meta charset="utf-8" />
+        <title>Horario ${formatDate(weekKey)}</title>
+        <style>${collectPageStyles(true)}</style>
+        <style>
+          body { margin: 14px; background: #fff; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          .week-export-sheet { position: static !important; width: 100% !important; }
+          .export-hidden, .week-issues-column { display: none !important; }
+          .week-main.with-issues { grid-template-columns: minmax(0, 1fr) !important; }
+          @page { size: landscape; margin: 10mm; }
+        </style>
+      </head>
+      <body>${exportNode.innerHTML}</body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+  }, 250);
+}
+
+function buildWeekExportNode(weekBlock) {
+  const wrapper = document.createElement("section");
+  wrapper.className = "week-export-sheet";
+  const legend = document.querySelector(".legend")?.cloneNode(true);
+  const clone = weekBlock.cloneNode(true);
+  clone.classList.remove("collapsed-week");
+  clone.querySelectorAll(".export-hidden").forEach((node) => node.remove());
+  if (legend) wrapper.append(legend);
+  wrapper.append(clone);
+  return wrapper;
+}
+
+function collectPageStyles(asText = false) {
+  const css = [...document.styleSheets]
+    .map((sheet) => {
+      try {
+        return [...sheet.cssRules].map((rule) => rule.cssText).join("\n");
+      } catch {
+        return "";
+      }
+    })
+    .join("\n");
+  return asText ? css : `<style>${css}</style>`;
+}
+
+function downloadUrl(url, filename) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
 }
 
 function buildXlsxWorkbook() {
@@ -1444,7 +1755,7 @@ function scheduleWorksheetXml() {
     blankCell("B3"),
     xlsxCell("C3", "B", "shiftB"),
     xlsxCell("D3", "10:30 a 20:30 hrs.", "bold"),
-    xlsxCell("E3", "10:30 a 19:30 hrs.", "bold"),
+    xlsxCell("E3", "10:30 a 17:30 hrs.", "bold"),
     xlsxCell("F3", "Remoto", "remote"),
     xlsxCell("G3", "Licencia médica", "medical"),
     xlsxCell("H3", "Receso", "recess"),
@@ -1813,7 +2124,7 @@ function formatDate(key) {
 }
 
 function shiftSummaryText() {
-  return "A: 8:30-18:30 / 17:30 | B: 10:30-20:30 / 19:30";
+  return "A: 8:30-18:30 / 17:30 | B: 10:30-20:30 / 17:30";
 }
 
 function escapeHtml(value) {

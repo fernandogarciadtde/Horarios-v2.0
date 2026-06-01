@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Service Desk | Planificador de Turnos</title>
-    <link rel="stylesheet" href="styles.css?v=remote-rules-20260519h" />
+    <link rel="stylesheet" href="styles.css?v=engine-rules-20260528w" />
   </head>
   <body>
     <header class="topbar">
@@ -18,6 +18,7 @@
           <span id="sessionRole">Administrador</span>
           <strong id="sessionName">Usuario</strong>
         </div>
+        <button id="adminNavBtn" class="logout-button" hidden>Administracion</button>
         <button id="passwordBtn" class="logout-button">Contraseña</button>
         <input id="profilePhotoInput" class="visually-hidden" type="file" accept="image/*" />
         <button id="profilePhotoBtn" class="logout-button">Foto</button>
@@ -26,37 +27,59 @@
     </header>
 
     <main id="appShell" class="app-shell" hidden>
-      <aside class="sidebar">
-        <section class="panel">
-          <h2>Periodo</h2>
-          <label>
-            Mes
-            <select id="monthSelect"></select>
-          </label>
-          <label>
-            Año
-            <input id="yearInput" type="number" min="2026" max="2035" />
-          </label>
-          <label>
-            Vista
-            <select id="calendarViewMode">
-              <option value="month">Todo el mes</option>
-              <option value="week">Solo la semana</option>
-              <option value="my-week">Mis turnos semanales</option>
-              <option value="my-month">Mis turnos mensuales</option>
-            </select>
-          </label>
-          <label id="weekSelectLabel">
-            Semana
-            <select id="weekSelect"></select>
-          </label>
-          <div class="button-row">
-            <button id="generateBtn" class="primary" data-admin-only>Sugerir horario</button>
-            <button id="exportBtn">Exportar Excel</button>
-          </div>
+      <section class="workspace">
+        <section class="calendar-control-row">
+          <section class="panel period-panel">
+            <h2>Periodo</h2>
+            <div class="period-fields">
+              <label>
+                Mes
+                <select id="monthSelect"></select>
+              </label>
+              <label>
+                Año
+                <input id="yearInput" type="number" min="2026" max="2035" />
+              </label>
+              <label>
+                Vista
+                <select id="calendarViewMode">
+                  <option value="month">Todo el mes</option>
+                  <option value="week">Solo la semana</option>
+                  <option value="my-week">Mis turnos semanales</option>
+                  <option value="my-month">Mis turnos mensuales</option>
+                </select>
+              </label>
+              <label id="weekSelectLabel">
+                Semana
+                <select id="weekSelect"></select>
+              </label>
+            </div>
+          </section>
+          <section id="rulesPanel" class="rules-panel" data-admin-only></section>
         </section>
+        <section class="legend">
+          <span><i class="swatch onsite"></i>Disponible presencial</span>
+          <span><i class="swatch remote"></i>Remoto</span>
+          <span><i class="swatch admin"></i>Administrativo</span>
+          <span><i class="swatch medical"></i>Licencia médica</span>
+          <span><i class="swatch union"></i>Salida sindicato</span>
+          <span><i class="swatch holiday"></i>Feriado</span>
+          <span><i class="swatch recess"></i>Receso institucional</span>
+        </section>
+        <div id="calendarView" class="calendar-view"></div>
+      </section>
+    </main>
+    <main id="adminShell" class="admin-shell" hidden>
+      <section class="admin-header panel">
+        <div>
+          <p class="eyebrow">Administracion</p>
+          <h2>Configuracion del planificador</h2>
+        </div>
+        <button id="calendarNavBtn" class="primary">Volver al calendario</button>
+      </section>
 
-        <section class="panel" data-admin-only>
+      <section class="admin-grid">
+        <section class="panel admin-agents-panel">
           <div class="section-head">
             <h2>Agentes</h2>
             <button id="resetBtn" class="ghost">Restaurar</button>
@@ -65,7 +88,7 @@
           <button id="addAgentBtn" class="wide">Agregar agente</button>
         </section>
 
-        <section class="panel" data-admin-only>
+        <section class="panel admin-special-panel">
           <h2>Feriados, recesos y obligatorios</h2>
           <div class="inline-form">
             <input id="specialDateInput" type="date" />
@@ -79,9 +102,10 @@
           <div id="specialDaysList" class="compact-list"></div>
         </section>
 
-        <section class="panel" data-admin-only>
-          <h2>Bloqueos recurrentes</h2>
-          <div class="inline-form">
+        <section class="panel admin-ops-panel">
+          <div class="admin-subsection">
+            <h2>Bloqueos recurrentes</h2>
+            <div class="inline-form">
             <select id="lockAgentInput"></select>
             <select id="lockDayInput">
               <option value="1">Lunes</option>
@@ -91,17 +115,19 @@
               <option value="5">Viernes</option>
             </select>
             <select id="lockModeInput">
-              <option value="remote">Remoto</option>
-              <option value="onsite">Presencial</option>
+              <option value="A-onsite">Turno A presencial</option>
+              <option value="B-onsite">Turno B presencial</option>
+              <option value="A-remote">Turno A remoto</option>
+              <option value="B-remote">Turno B remoto</option>
             </select>
             <button id="addLockBtn">Bloquear</button>
+            </div>
+            <div id="locksList" class="compact-list"></div>
           </div>
-          <div id="locksList" class="compact-list"></div>
-        </section>
 
-        <section class="panel" data-admin-only>
-          <h2>Ausencias</h2>
-          <div class="absence-grid">
+          <div class="admin-subsection">
+            <h2>Ausencias</h2>
+            <div class="absence-grid">
             <select id="absenceAgentInput"></select>
             <select id="absenceTypeInput">
               <option value="admin">Día administrativo</option>
@@ -116,31 +142,12 @@
               Indefinida
             </label>
             <button id="addAbsenceBtn">Agregar</button>
+            </div>
+            <div id="absencesList" class="compact-list"></div>
           </div>
-          <div id="absencesList" class="compact-list"></div>
         </section>
-
-        <section id="usersPanel" class="panel" data-admin-only hidden>
-          <h2>Usuarios</h2>
-          <div id="usersList" class="compact-list"></div>
-        </section>
-      </aside>
-
-      <section class="workspace">
-        <section id="rulesPanel" class="rules-panel" data-admin-only></section>
-        <section class="legend">
-          <span><i class="swatch onsite"></i>Disponible presencial</span>
-          <span><i class="swatch remote"></i>Remoto</span>
-          <span><i class="swatch admin"></i>Administrativo</span>
-          <span><i class="swatch medical"></i>Licencia médica</span>
-          <span><i class="swatch union"></i>Salida sindicato</span>
-          <span><i class="swatch holiday"></i>Feriado</span>
-          <span><i class="swatch recess"></i>Receso institucional</span>
-        </section>
-        <div id="calendarView" class="calendar-view"></div>
       </section>
     </main>
-
     <dialog id="cellDialog">
       <form method="dialog" class="modal">
         <div class="section-head">
@@ -148,11 +155,12 @@
             <p class="eyebrow" id="modalDate"></p>
             <h2 id="modalAgent"></h2>
           </div>
-          <button value="cancel" class="icon-button" aria-label="Cerrar">×</button>
+          <button value="cancel" class="icon-button" aria-label="Cerrar">&times;</button>
         </div>
         <label>
           Estado del bloque
           <select id="cellStatusInput">
+            <option value="assign">Asignar</option>
             <option value="A-onsite">Turno A presencial</option>
             <option value="B-onsite">Turno B presencial</option>
             <option value="A-remote">Turno A remoto</option>
@@ -166,11 +174,8 @@
             <option value="admin_afternoon">ADM B tarde</option>
             <option value="medical">Licencia médica</option>
             <option value="holiday">Feriado</option>
+            <option value="recess">Receso institucional</option>
           </select>
-        </label>
-        <label class="checkline">
-          <input id="cellLockedInput" type="checkbox" />
-          Bloquear este bloque para futuras regeneraciones
         </label>
         <div class="button-row end">
           <button value="cancel">Cancelar</button>
@@ -186,7 +191,7 @@
             <p class="eyebrow">Cuenta</p>
             <h2>Cambiar contraseña</h2>
           </div>
-          <button value="cancel" class="icon-button" aria-label="Cerrar">×</button>
+          <button value="cancel" class="icon-button" aria-label="Cerrar">&times;</button>
         </div>
         <label>
           Contraseña actual
@@ -211,7 +216,7 @@
             <p class="eyebrow">Administración</p>
             <h2 id="resetPasswordTitle">Resetear contraseña</h2>
           </div>
-          <button value="cancel" class="icon-button" aria-label="Cerrar">×</button>
+          <button value="cancel" class="icon-button" aria-label="Cerrar">&times;</button>
         </div>
         <label>
           Nueva contraseña temporal
@@ -225,6 +230,6 @@
       </form>
     </dialog>
 
-    <script src="app.js?v=remote-rules-20260519h"></script>
+    <script src="app.js?v=engine-rules-20260528w"></script>
   </body>
 </html>

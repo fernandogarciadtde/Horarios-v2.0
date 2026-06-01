@@ -103,7 +103,7 @@ button:hover {
 
 .admin-pill {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
   gap: 8px;
   align-items: center;
   padding: 10px 14px;
@@ -157,9 +157,9 @@ button:hover {
   font-weight: 700;
 }
 
-.readonly .sidebar button:not(#exportBtn),
-.readonly .sidebar input:not(#profilePhotoInput),
-.readonly .sidebar select:not(#calendarViewMode):not(#weekSelect),
+.readonly .period-panel button,
+.readonly .period-panel input:not(#profilePhotoInput),
+.readonly .period-panel select:not(#calendarViewMode):not(#weekSelect),
 .readonly .cell-btn {
   pointer-events: none;
   opacity: 0.72;
@@ -171,49 +171,65 @@ button:hover {
 }
 
 .app-shell {
+  display: block;
+  padding: 18px;
+}
+
+.admin-shell {
   display: grid;
-  grid-template-columns: 360px minmax(0, 1fr);
   gap: 18px;
   padding: 18px;
 }
 
-.app-shell.readonly {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.sidebar {
-  display: grid;
-  align-content: start;
-  gap: 14px;
-}
-
-.readonly .sidebar {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.readonly .sidebar .panel {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(120px, 1fr));
-  gap: 12px;
+.admin-header {
+  display: flex;
   align-items: center;
-  width: 100%;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
 }
 
-.readonly .sidebar .panel h2 {
-  grid-column: 1 / -1;
-  margin-bottom: 0;
+.admin-header h2 {
+  margin: 2px 0 0;
+  color: var(--ucen-blue);
 }
 
-.readonly .sidebar .button-row {
-  align-self: end;
+.admin-grid {
+  display: grid;
+  grid-template-columns: minmax(420px, 1.2fr) minmax(340px, 1fr) minmax(340px, 1fr);
+  grid-template-areas:
+    "agents ops special";
+  gap: 16px;
+  align-items: start;
 }
 
-.readonly .sidebar label {
-  margin-bottom: 0;
+.admin-agents-panel {
+  grid-area: agents;
 }
 
-.readonly .workspace,
-.readonly .calendar-view {
+.admin-ops-panel {
+  display: grid;
+  grid-area: ops;
+  gap: 18px;
+}
+
+.admin-special-panel {
+  grid-area: special;
+}
+
+.admin-subsection {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.admin-subsection + .admin-subsection {
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.workspace,
+.calendar-view {
   width: 100%;
 }
 
@@ -228,6 +244,40 @@ button:hover {
 
 .panel {
   padding: 14px;
+}
+
+.calendar-control-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+  margin-bottom: 12px;
+}
+
+.period-panel,
+.rules-panel {
+  min-width: 0;
+}
+
+.period-panel {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.period-panel h2 {
+  margin-bottom: 0;
+}
+
+.period-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.period-panel .button-row {
+  justify-content: flex-start;
 }
 
 .panel h2,
@@ -297,26 +347,42 @@ select {
 }
 
 .agent-row {
-  grid-template-columns: calc(var(--avatar-size) + 6px) minmax(0, 1fr) auto;
+  grid-template-columns: calc(var(--avatar-size) + 6px) minmax(0, 1fr) auto auto;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
 }
 
 .agent-row input {
   min-width: 0;
 }
 
+.agent-meta {
+  grid-column: 2 / 4;
+  grid-row: 2;
+  color: var(--muted);
+}
+
 .agent-row .photo-button {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 3;
+  justify-self: start;
 }
 
 .agent-row .clear-photo-button {
   grid-column: 3;
-  grid-row: 2;
+  grid-row: 3;
 }
 
 .agent-row .remove-agent-button {
-  grid-column: 3;
+  grid-column: 4;
   grid-row: 1;
+}
+
+.agent-row .reset-password-button {
+  grid-column: 4;
+  grid-row: 3;
 }
 
 .agent-avatar,
@@ -517,9 +583,11 @@ select {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
-.week-toggle {
+.week-toggle,
+.week-export-pdf {
   min-height: 30px;
   padding: 4px 9px;
   border-color: rgba(255, 255, 255, 0.42);
@@ -528,21 +596,81 @@ select {
   font-size: 12px;
 }
 
+.week-export-sheet {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: max-content;
+  max-width: none;
+  padding: 0;
+  background: #fff;
+}
+
+.week-export-sheet .legend {
+  margin-bottom: 12px;
+}
+
+.week-export-sheet .week-block {
+  width: 1868px;
+}
+
+.week-export-sheet .week-main.with-issues {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.week-export-sheet .week-issues-column,
+.week-export-sheet .export-hidden {
+  display: none !important;
+}
+
 .collapsed-week .week-body {
   display: none;
 }
 
-.week-issues {
+.week-main {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+}
+
+.week-main.with-issues {
+  grid-template-columns: minmax(0, 3fr) minmax(240px, 1fr);
+}
+
+.week-table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.week-issues-column {
+  display: grid;
+  align-content: start;
   gap: 6px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--line);
+  min-width: 0;
+  padding: 12px 14px;
+  border-left: 1px solid var(--line);
   background: #fff7ed;
+}
+
+.week-notification-toggle,
+.week-undo,
+.week-reset {
+  width: 100%;
+  min-height: 34px;
+  margin-top: 6px;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.week-notifications {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.45);
 }
 
 .schedule-table {
   width: 100%;
-  min-width: 1080px;
+  min-width: 840px;
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -703,12 +831,16 @@ dialog::backdrop {
 }
 
 @media (max-width: 1020px) {
-  .app-shell {
+  .admin-grid {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "agents"
+      "ops"
+      "special";
   }
 
-  .sidebar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .calendar-control-row {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -718,15 +850,20 @@ dialog::backdrop {
     flex-direction: column;
   }
 
-  .readonly .sidebar .panel {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    grid-template-columns: 1fr;
+  .period-fields {
+    grid-template-columns: 1fr 1fr;
   }
 
   .week-block {
     overflow-x: auto;
+  }
+
+  .week-main.with-issues {
+    grid-template-columns: 1fr;
+  }
+
+  .week-issues-column {
+    border-top: 1px solid var(--line);
+    border-left: 0;
   }
 }

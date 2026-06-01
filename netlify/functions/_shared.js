@@ -2,7 +2,7 @@
 const { getStore } = require("@netlify/blobs");
 
 const cookieName = "ucen_sd_session";
-const requiredEnv = ["ADMIN_EMAIL", "ADMIN_PASSWORD", "DEFAULT_TUTOR_PASSWORD", "CAFE_DIGITAL_EMAIL", "DEFAULT_CAFE_PASSWORD", "SESSION_SECRET"];
+const requiredEnv = ["ADMIN_EMAIL", "ADMIN_PASSWORD", "DEFAULT_TUTOR_PASSWORD", "SESSION_SECRET"];
 
 function json(statusCode, body, headers = {}) {
   return {
@@ -28,7 +28,7 @@ async function readUsers() {
   assertRequiredEnv();
   const store = await getUserStore();
   const saved = await store.get("users", { type: "json" });
-  if (saved?.users?.length) return saved.users;
+  if (saved?.users?.length) return saved.users.filter((user) => user.role !== "cafe_digital" && user.id !== "cafe-digital");
   const users = createDefaultUsers();
   await writeUsers(users);
   return users;
@@ -53,8 +53,8 @@ function createDefaultUsers() {
   assertRequiredEnv();
   const tutors = [
     [process.env.TUTOR_MONSERRAT_EMAIL, "Monserrat Vargas"],
-    [process.env.TUTOR_VIVIANA_EMAIL, "Viviana BriceÃ±o"],
-    [process.env.TUTOR_FERNANDO_EMAIL, "Fernando GarcÃ­a"],
+    [process.env.TUTOR_VIVIANA_EMAIL, "Viviana Briceño"],
+    [process.env.TUTOR_FERNANDO_EMAIL, "Fernando García"],
     [process.env.TUTOR_DENISSE_BRAVO_EMAIL, "Denisse Bravo"],
     [process.env.TUTOR_DENISSE_ROSSEL_EMAIL, "Denisse Rossel"],
   ];
@@ -78,13 +78,6 @@ function createDefaultUsers() {
           role: "tutor",
         }),
       ),
-    createUser({
-      id: "cafe-digital",
-      name: process.env.CAFE_DIGITAL_NAME || "CafÃ© Digital",
-      email: process.env.CAFE_DIGITAL_EMAIL,
-      password: process.env.DEFAULT_CAFE_PASSWORD,
-      role: "cafe_digital",
-    }),
   ];
 }
 

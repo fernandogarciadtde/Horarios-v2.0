@@ -61,7 +61,7 @@ local_data/state.json
 local_data/users.json
 ```
 
-Estos archivos guardan calendario, usuarios, fotos y contrasenas. Para respaldar la app basta copiar la carpeta completa, incluyendo `local_data`.
+Estos archivos guardan calendario, usuarios, fotos y contraseñas. Para respaldar la app basta copiar la carpeta completa, incluyendo `local_data`.
 
 ## Reiniciar datos
 
