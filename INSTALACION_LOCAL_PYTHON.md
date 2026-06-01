@@ -10,6 +10,8 @@ Esta version permite ejecutar la app en un computador local de la universidad si
 
 No requiere instalar paquetes con `pip`: usa solo librerias incluidas en Python.
 
+El archivo `requirements.txt` se incluye como referencia y no instala dependencias externas.
+
 ## Iniciar
 
 Opcion simple:

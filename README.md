@@ -23,6 +23,8 @@ Esta es la version oficial del proyecto. Se ejecuta con Python en el computador 
 - No requiere instalar paquetes con `pip`.
 - No requiere Node para ejecutar la app.
 
+El archivo `requirements.txt` queda incluido solo como referencia; no hay dependencias externas.
+
 ## Iniciar
 
 Opcion simple:
