@@ -16,6 +16,15 @@ La version oficial actual es la version Python local.
 
 Netlify fue descartado y eliminado del proyecto. No retomar el camino de Netlify salvo que Fernando lo pida explicitamente.
 
+La rama principal publicada es `main`. El ultimo estado importante subido incluye:
+
+- Version Python local como camino principal.
+- Eliminacion de Netlify y sus funciones.
+- Archivo `requirements.txt` agregado como referencia.
+- Este archivo `CONTEXTO_CODEX.md` para sincronizar contexto entre casa y oficina.
+
+Regla de trabajo: cuando se tome una decision relevante del proyecto, actualizar este archivo antes de cerrar la sesion o publicar cambios.
+
 ## Como ejecutar
 
 En Windows:
@@ -49,6 +58,16 @@ El puerto se puede cambiar con la variable `PORT`.
 - `iniciar_app_python.bat`: acceso rapido para Windows.
 - `README.md`: instrucciones generales.
 - `INSTALACION_LOCAL_PYTHON.md`: guia local resumida.
+- `requirements.txt`: referencia de dependencias Python.
+- `CONTEXTO_CODEX.md`: memoria operativa para retomar con Codex.
+
+## Dependencias
+
+La app usa solo librerias estandar de Python.
+
+`requirements.txt` existe para facilitar instalacion/documentacion, pero no instala paquetes externos.
+
+No hace falta ejecutar `pip install` para usar la app.
 
 ## Datos locales
 
@@ -97,6 +116,14 @@ git push origin main
 
 No agregar `local_data` al commit.
 
+Si se trabaja desde una nueva conversacion de Codex, pedir:
+
+```text
+Lee CONTEXTO_CODEX.md y retoma desde ahi.
+```
+
+Si hay cambios de contexto, agregarlos a este archivo y publicarlos con Git.
+
 ## Validaciones utiles
 
 Validar Python:
@@ -121,7 +148,26 @@ http://127.0.0.1:4174
 
 - Evaluar generar un `.exe` o paquete instalable para instalarlo mas facil en el PC de Cristopher.
 - Si se genera `.exe`, cuidar que `local_data` quede fuera del ejecutable y editable junto al programa.
+- PyInstaller no esta instalado actualmente en este equipo. Se intento instalar, pero la descarga fue bloqueada por permisos/red y Fernando interrumpio la autorizacion.
+- Alternativa simple: entregar carpeta del proyecto con `iniciar_app_python.bat` y Python instalado.
+- Alternativa empaquetada: crear `.exe` con PyInstaller cuando haya permiso para instalarlo o cuando se trabaje desde un equipo con PyInstaller disponible.
 - Mantener el proyecto simple y local mientras no exista una decision institucional sobre servidor o red interna.
+
+## Publicacion actual
+
+GitHub se usa para sincronizar el codigo entre casa y oficina:
+
+```text
+https://github.com/fernandogarciadtde/Horarios-v2.0
+```
+
+GitHub no publica una web funcional de esta version, porque la app Python corre localmente en cada computador.
+
+La URL de uso siempre es local al equipo que ejecuta el servidor:
+
+```text
+http://127.0.0.1:4174
+```
 
 ## Archivos locales no publicados
 
