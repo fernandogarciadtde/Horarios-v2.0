@@ -1,5 +1,6 @@
 const sessionName = document.querySelector("#manualSessionName");
 const sessionRole = document.querySelector("#manualSessionRole");
+const sessionAvatar = document.querySelector("#manualSessionAvatar");
 const logoutBtn = document.querySelector("#manualLogoutBtn");
 const manualBackTopBtn = document.querySelector("#manualBackTopBtn");
 
@@ -26,6 +27,7 @@ async function loadManualSession() {
   }
   sessionName.textContent = payload.user.name || "Usuario";
   sessionRole.textContent = roleLabels[payload.user.role] || "Consulta";
+  if (sessionAvatar) sessionAvatar.innerHTML = avatarContentHtml(payload.user);
 }
 
 logoutBtn?.addEventListener("click", async () => {
@@ -51,3 +53,28 @@ window.addEventListener("resize", updateManualBackTopButton);
 updateManualBackTopButton();
 
 loadManualSession();
+
+function avatarContentHtml(person = {}) {
+  return person.photo
+    ? `<img src="${escapeHtml(person.photo)}" alt="${escapeHtml(person.name || "Usuario")}" />`
+    : `<span>${personInitials(person.name)}</span>`;
+}
+
+function personInitials(name = "") {
+  const initials = String(name)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || "")
+    .join("");
+  return escapeHtml(initials || "?");
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
