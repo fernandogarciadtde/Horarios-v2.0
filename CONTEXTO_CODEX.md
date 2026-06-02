@@ -33,6 +33,14 @@ En Windows:
 iniciar_app_python.bat
 ```
 
+Este lanzador intenta:
+
+- Hacer `git pull --ff-only origin main` al abrir.
+- Iniciar el servidor Python local.
+- Hacer `git add -A`, commit automatico y `git push origin main` al cerrar el servidor si hay cambios de codigo.
+
+Objetivo: que Fernando pueda trabajar entre casa y oficina sin escribir comandos antes o despues de usar la app.
+
 O por consola:
 
 ```bat
@@ -100,7 +108,15 @@ Tutor.2026!
 
 ## Flujo entre casa y oficina
 
-Antes de trabajar en un computador:
+Flujo recomendado para uso normal:
+
+```bat
+iniciar_app_python.bat
+```
+
+Ese lanzador sincroniza automaticamente el codigo al abrir y al cerrar.
+
+Flujo manual alternativo, si el lanzador falla o se necesita resolver algo:
 
 ```bat
 git pull origin main
@@ -115,6 +131,8 @@ git push origin main
 ```
 
 No agregar `local_data` al commit.
+
+El archivo `.gitignore` excluye `local_data`, logs, zips y los archivos locales del informe para evitar publicaciones accidentales.
 
 Si se trabaja desde una nueva conversacion de Codex, pedir:
 

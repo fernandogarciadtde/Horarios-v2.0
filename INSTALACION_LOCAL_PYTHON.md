@@ -20,6 +20,8 @@ Opcion simple:
 iniciar_app_python.bat
 ```
 
+El lanzador sincroniza el codigo con GitHub al abrir y publica cambios al cerrar el servidor, si Git esta disponible.
+
 Opcion por consola:
 
 ```bat

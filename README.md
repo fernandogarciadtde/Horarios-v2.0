@@ -33,6 +33,8 @@ Opcion simple:
 iniciar_app_python.bat
 ```
 
+Ese archivo intenta sincronizar el codigo con GitHub al abrir y vuelve a publicar cambios cuando se cierra el servidor.
+
 Opcion por consola:
 
 ```bat
@@ -89,12 +91,13 @@ cd Horarios-v2.0
 iniciar_app_python.bat
 ```
 
-Si ya existe la carpeta:
+Si ya existe la carpeta, basta abrir:
 
 ```bat
-git pull origin main
 iniciar_app_python.bat
 ```
+
+El lanzador hace la sincronizacion de codigo de forma automatica. `local_data` queda fuera de GitHub y no se sincroniza.
 
 ## Reiniciar datos
 
