@@ -22,6 +22,7 @@ La rama principal publicada es `main`. El ultimo estado importante subido incluy
 - Eliminacion de Netlify y sus funciones.
 - Archivo `requirements.txt` agregado como referencia.
 - Este archivo `CONTEXTO_CODEX.md` para sincronizar contexto entre casa y oficina.
+- Commit de oficina `8684398`: actualizacion de interfaz y reglas vigentes.
 
 Regla de trabajo: cuando se tome una decision relevante del proyecto, actualizar este archivo antes de cerrar la sesion o publicar cambios.
 
@@ -63,6 +64,8 @@ El puerto se puede cambiar con la variable `PORT`.
 - `app.js`: logica principal del calendario y administracion.
 - `login.js`: logica de inicio de sesion.
 - `styles.css`: estilos.
+- `reglas-vigentes.html`: vista de reglas vigentes.
+- `reglas-vigentes.js`: logica de la vista de reglas vigentes.
 - `iniciar_app_python.bat`: acceso rapido para Windows.
 - `README.md`: instrucciones generales.
 - `INSTALACION_LOCAL_PYTHON.md`: guia local resumida.
@@ -155,6 +158,8 @@ Validar JavaScript:
 ```bat
 npm.cmd run check
 ```
+
+El chequeo JS actual valida `app.js`, `login.js` y `reglas-vigentes.js`.
 
 La app debe responder en:
 
