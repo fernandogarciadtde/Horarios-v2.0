@@ -321,7 +321,7 @@ a.link-button,
 
 .calendar-control-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr);
   gap: 14px;
   align-items: stretch;
   margin-bottom: 12px;
@@ -569,6 +569,16 @@ select {
 }
 
 .rules-summary .rule-message {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.rules-summary-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
   font-size: 13px;
   line-height: 1.25;
 }
@@ -1055,6 +1065,12 @@ select {
 .expired-cell strong,
 .expired-cell span {
   color: #4c5563;
+}
+
+.status-medical.expired-cell,
+.status-medical.expired-cell strong,
+.status-medical.expired-cell span {
+  color: var(--status-medical-text);
 }
 
 .status-onsite {

@@ -1606,11 +1606,14 @@ function renderRules() {
   el.rulesPanel.className = `rules-panel rules-summary ${issues.length ? "warn" : "ok"}`;
   el.rulesPanel.innerHTML = `
     <div class="rules-summary-copy">
-      <p class="rule-message"><strong>Resumen del calendario:</strong> Organiza los turnos semanales del equipo seg&uacute;n mes, feriados, ausencias y bloqueos definidos.</p>
-      <p class="rule-message">Cada celda representa un bloque diario completo con tutor, turno, modalidad o estado especial.</p>
-      <p class="rule-message">El c&aacute;lculo prioriza cobertura presencial en A y B, distribuyendo remotos y turnos B de manera proporcional.</p>
-      <p class="rule-message">Los d&iacute;as vencidos quedan bloqueados y los ajustes manuales se respetan en los rec&aacute;lculos posteriores.</p>
-      <p class="rule-message">Las incongruencias se informan bajo cada semana para apoyar la decisi&oacute;n operativa sin impedir la edici&oacute;n.</p>
+      <p class="rule-message"><strong>Resumen del calendario:</strong></p>
+      <ul class="rules-summary-list">
+        <li>Organiza los turnos semanales del equipo seg&uacute;n mes, feriados, ausencias y bloqueos definidos.</li>
+        <li>Cada celda representa un bloque diario completo con tutor, turno, modalidad o estado especial.</li>
+        <li>El c&aacute;lculo prioriza cobertura presencial en A y B, distribuyendo remotos y turnos B de manera proporcional.</li>
+        <li>Los d&iacute;as vencidos quedan bloqueados y los ajustes manuales se respetan en los rec&aacute;lculos posteriores.</li>
+        <li>Las incongruencias se informan bajo cada semana para apoyar la decisi&oacute;n operativa sin impedir la edici&oacute;n.</li>
+      </ul>
     </div>
     <div class="rules-summary-action">
       <a class="rules-manual-link" href="reglas-vigentes.html">Ver todas las reglas vigentes</a>
