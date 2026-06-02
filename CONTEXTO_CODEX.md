@@ -176,6 +176,12 @@ http://127.0.0.1:4174
 - Alternativa empaquetada: crear `.exe` con PyInstaller cuando haya permiso para instalarlo o cuando se trabaje desde un equipo con PyInstaller disponible.
 - Mantener el proyecto simple y local mientras no exista una decision institucional sobre servidor o red interna.
 
+## Reglas operativas confirmadas
+
+- Turnos B: cada tutor activo debe tener 2 turnos B por semana cuando tiene al menos 2 bloques trabajables. Si por ausencia, feriado, receso o bloqueo tiene menos bloques, el objetivo baja al total de bloques trabajables de esa persona.
+- La validacion de turnos B no debe usar un rango proporcional global que pueda decir "deben ser 0" para una persona con bloques trabajables.
+- La incongruencia "salida sindicato solo aplica..." no debe mostrarse como mensaje semanal porque la interfaz ya impide asignarla a personas no habilitadas.
+
 ## Publicacion actual
 
 GitHub se usa para sincronizar el codigo entre casa y oficina:

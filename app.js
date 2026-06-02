@@ -722,10 +722,10 @@ function rebalanceWeeklyTargets(schedule) {
       let bCount = week.filter((date) => isWorkShift(schedule[weekKey][agent.id][dateKey(date)], "B")).length;
       let remoteCount = week.filter((date) => getMode(schedule[weekKey][agent.id][dateKey(date)]) === "remote").length;
       const remoteTarget = weeklyRemoteTarget(schedule, weekKey, week, agent.id, weekIndex);
-      const bRange = weeklyBRange(schedule, weekKey, week);
+      const bTarget = weeklyBTarget(schedule, weekKey, week, agent.id);
 
       for (const date of week) {
-        if (bCount <= bRange.max) break;
+        if (bCount <= bTarget) break;
         const cell = schedule[weekKey][agent.id][dateKey(date)];
         if (canAdjustWorkCell(cell) && isWorkShift(cell, "B") && canKeepDailyCoverageAfterChange(schedule, weekKey, dateKey(date), agent.id, "A", getMode(cell), isUnionStatus(cell))) {
           setShift(cell, "A");
@@ -824,22 +824,9 @@ function weeklyRemoteCount(schedule, weekKey, week, agentId) {
   return week.filter((date) => getMode(schedule[weekKey]?.[agentId]?.[dateKey(date)]) === "remote").length;
 }
 
-function weeklyBRange(schedule, weekKey, week) {
-  const activeAgentIds = state.agents
-    .filter((agent) => week.some((date) => isEditableWorkCell(schedule[weekKey]?.[agent.id]?.[dateKey(date)])))
-    .map((agent) => agent.id);
-  if (!activeAgentIds.length) return { min: 0, max: 0 };
-
-  const totalDailyBTarget = week.reduce((sum, date) => {
-    const dayKey = dateKey(date);
-    const activeCount = state.agents.filter((agent) => isEditableWorkCell(schedule[weekKey]?.[agent.id]?.[dayKey])).length;
-    return sum + Math.floor(activeCount / 2);
-  }, 0);
-
-  return {
-    min: Math.floor(totalDailyBTarget / activeAgentIds.length),
-    max: Math.ceil(totalDailyBTarget / activeAgentIds.length),
-  };
+function weeklyBTarget(schedule, weekKey, week, agentId) {
+  const eligibleDays = week.filter((date) => isEditableWorkCell(schedule[weekKey]?.[agentId]?.[dateKey(date)])).length;
+  return Math.min(2, eligibleDays);
 }
 
 function monthlyOnsiteShiftCount(agentId, shift, schedule) {
@@ -1643,18 +1630,13 @@ function weeklyRuleIssues() {
       const remote = workCells.filter(({ cell }) => getMode(cell) === "remote").length;
       const remoteTarget = weeklyRemoteTarget(state.schedule, weekKey, week, agent.id, weekIndex);
       const bShifts = workCells.filter(({ cell }) => isWorkShift(cell, "B")).length;
-      const bRange = weeklyBRange(state.schedule, weekKey, week);
+      const bTarget = weeklyBTarget(state.schedule, weekKey, week, agent.id);
       const unavailable = cells.filter(({ cell }) => isUnavailableStatus(cell.status)).length;
-      const unionCount = cells.filter(({ cell }) => isUnionStatus(cell)).length;
-      if (unionCount && !canUseUnion(agent.name)) {
-        issues.push(`${agent.name}: salida sindicato solo aplica para Denisse Bravo y Monserrat Vargas.`);
-      }
       if (workCells.length >= 2 && remote !== remoteTarget) {
         issues.push(`${agent.name}: tiene ${remote} remoto(s), deben ser ${remoteTarget}.`);
       }
-      if (workCells.length >= 2 && (bShifts < bRange.min || bShifts > bRange.max)) {
-        const expected = bRange.min === bRange.max ? `deben ser ${bRange.min}` : `deben estar entre ${bRange.min} y ${bRange.max}`;
-        issues.push(`${agent.name}: tiene ${bShifts} turno(s) B, ${expected}.`);
+      if (workCells.length >= 2 && bShifts !== bTarget) {
+        issues.push(`${agent.name}: tiene ${bShifts} turno(s) B, deben ser ${bTarget}.`);
       }
       if (workCells.length < 2 && unavailable > 0 && !hasPermanentMedicalAbsence(agent.id)) {
         issues.push(`${agent.name}: ausencia/feriado impide completar proporcionalidad semanal.`);
