@@ -179,6 +179,7 @@ a.link-button,
   transition:
     opacity 180ms ease,
     transform 220ms ease,
+    background-color 180ms ease,
     border-color 180ms ease;
 }
 
@@ -189,7 +190,8 @@ a.link-button,
 }
 
 .back-top-button:hover {
-  border-color: #fff;
+  border-color: var(--ucen-light-blue);
+  background: var(--ucen-blue);
 }
 
 .manual-session {
