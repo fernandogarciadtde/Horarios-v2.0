@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Service Desk | Planificador de Turnos</title>
-    <link rel="stylesheet" href="styles.css?v=engine-rules-20260528w" />
+    <title>Planificador Turnos Tutoría | DTDE</title>
+    <link rel="stylesheet" href="styles.css?v=manual-color-fixes-20260601" />
   </head>
   <body>
     <header class="topbar">
       <div>
-        <p class="eyebrow">Universidad Central | Service Desk</p>
-        <h1>Planificador de turnos</h1>
+        <p class="eyebrow">Dirección de Transformación Digital Educativa DTDE</p>
+        <h1>Equipo de Tutoría y Acompañamiento</h1>
       </div>
       <div class="admin-pill">
         <div id="sessionAvatar" class="profile-avatar"><span>U</span></div>
@@ -57,7 +57,7 @@
           </section>
           <section id="rulesPanel" class="rules-panel" data-admin-only></section>
         </section>
-        <section class="legend">
+        <section class="legend legend-template" hidden>
           <span><i class="swatch onsite"></i>Disponible presencial</span>
           <span><i class="swatch remote"></i>Remoto</span>
           <span><i class="swatch admin"></i>Administrativo</span>
@@ -148,6 +148,7 @@
         </section>
       </section>
     </main>
+    <button id="backTopBtn" class="back-top-button" type="button" aria-label="Volver arriba">Volver arriba</button>
     <dialog id="cellDialog">
       <form method="dialog" class="modal">
         <div class="section-head">
@@ -230,6 +231,6 @@
       </form>
     </dialog>
 
-    <script src="app.js?v=engine-rules-20260528w"></script>
+    <script src="app.js?v=manual-color-fixes-20260601"></script>
   </body>
 </html>

@@ -46,6 +46,9 @@ let showWeeklyNotifications = true;
 const undoHistory = [];
 const collapsedWeeks = new Set();
 const maxPhotoSize = 240;
+let renderWeeklyIssues = null;
+let renderWeeklyNotifications = null;
+let calendarRenderToken = 0;
 
 const el = {
   appShell: document.querySelector("#appShell"),
@@ -102,6 +105,7 @@ const el = {
   cellStatusInput: document.querySelector("#cellStatusInput"),
   cellLockedInput: document.querySelector("#cellLockedInput"),
   saveCellBtn: document.querySelector("#saveCellBtn"),
+  backTopBtn: document.querySelector("#backTopBtn"),
   adminOnly: document.querySelectorAll("[data-admin-only]"),
 };
 
@@ -280,6 +284,21 @@ function bindEvents() {
   el.addLockBtn.addEventListener("click", addRecurringLock);
   el.addAbsenceBtn.addEventListener("click", addAbsence);
   el.saveCellBtn.addEventListener("click", saveCellEdit);
+  el.backTopBtn?.addEventListener("click", () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  window.addEventListener("scroll", updateBackTopButton, { passive: true });
+  window.addEventListener("resize", updateBackTopButton);
+  updateBackTopButton();
+}
+
+function updateBackTopButton() {
+  if (!el.backTopBtn) return;
+  const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+  const progress = Math.min(1, Math.max(0, window.scrollY / maxScroll));
+  const parallaxOffset = Math.round((1 - progress) * 18);
+  el.backTopBtn.style.setProperty("--back-top-offset", `${parallaxOffset}px`);
+  el.backTopBtn.classList.toggle("is-visible", progress >= 0.9);
 }
 
 async function loadUsers() {
@@ -395,7 +414,7 @@ function generateSchedule(onlyWeekKey = null) {
 
   state.schedule = schedule;
   saveState();
-  render();
+  renderScheduleUpdate(onlyWeekKey);
 }
 
 function assignMonthlyFridayB(schedule, weekKey, friday, fridayB, weekIndex) {
@@ -522,7 +541,77 @@ function hasRemoteCapacityForDay(schedule, weekKey, dayKey, nextRemoteAgentId) {
 }
 
 function balanceMonthlyFridayB(schedule) {
+  const assignments = monthlyFridayAssignments(schedule);
+  const counts = new Map(state.agents.map((agent) => [agent.id, 0]));
+  const fridayKeys = [...new Set(assignments.map((item) => item.dayKey))].sort();
+
+  fridayKeys.forEach((dayKey, fridayIndex) => {
+    const dayAssignments = assignments.filter((item) => item.dayKey === dayKey && isEditableWorkCell(item.cell));
+    if (!dayAssignments.length) return;
+    const lockedB = dayAssignments.filter((item) => isOnsiteShift(item.cell, "B") && !canAdjustWorkCell(item.cell));
+    const target = lockedB[0] || preferredFridayBAssignment(dayAssignments, counts, fridayIndex);
+    if (!target) return;
+
+    dayAssignments.forEach((item) => {
+      if (item.agent.id === target.agent.id) return;
+      if (!isOnsiteShift(item.cell, "B") || !canAdjustWorkCell(item.cell)) return;
+      item.cell.status = buildStatus("A", "onsite", isUnionStatus(item.cell));
+    });
+
+    if (!isOnsiteShift(target.cell, "B") && canAdjustWorkCell(target.cell)) {
+      target.cell.status = buildStatus("B", "onsite", isUnionStatus(target.cell));
+    }
+
+    dayAssignments
+      .filter((item) => isOnsiteShift(item.cell, "B"))
+      .forEach((item) => {
+        counts.set(item.agent.id, (counts.get(item.agent.id) || 0) + 1);
+      });
+  });
+
   return schedule;
+}
+
+function preferredFridayBAssignment(dayAssignments, counts, fridayIndex) {
+  const candidates = dayAssignments.filter((item) => isOnsiteShift(item.cell, "B") || canAdjustWorkCell(item.cell));
+  if (!candidates.length) return null;
+  const minCount = Math.min(...candidates.map((item) => counts.get(item.agent.id) || 0));
+  return candidates
+    .filter((item) => (counts.get(item.agent.id) || 0) === minCount)
+    .sort((a, b) => fridayRotationScore(a.agent, fridayIndex) - fridayRotationScore(b.agent, fridayIndex))[0];
+}
+
+function fridayRotationScore(agent, fridayIndex) {
+  const agentCount = Math.max(1, state.agents.length);
+  return ((agent.order || 0) + state.month + fridayIndex) % agentCount;
+}
+
+function monthlyFridayAssignments(schedule) {
+  const assignments = [];
+  getMonthWeeks(state.year, state.month).forEach((week) => {
+    const weekKey = dateKey(week[0]);
+    week.forEach((date) => {
+      if (isoDay(date) !== 5 || date.getMonth() !== state.month) return;
+      const dayKey = dateKey(date);
+      state.agents.forEach((agent) => {
+        const cell = schedule[weekKey]?.[agent.id]?.[dayKey];
+        if (cell) assignments.push({ weekKey, dayKey, agent, cell });
+      });
+    });
+  });
+  return assignments;
+}
+
+function monthlyFridayBCounts(assignments) {
+  const counts = new Map(state.agents.map((agent) => [agent.id, 0]));
+  assignments.forEach(({ agent, cell }) => {
+    if (isOnsiteShift(cell, "B")) counts.set(agent.id, (counts.get(agent.id) || 0) + 1);
+  });
+  return counts;
+}
+
+function monthlyFridayBCount(agentId, schedule) {
+  return monthlyFridayBCounts(monthlyFridayAssignments(schedule)).get(agentId) || 0;
 }
 
 function balanceAllDailyShiftDistribution(schedule) {
@@ -895,12 +984,33 @@ function render() {
   showApp();
   el.monthSelect.value = state.month;
   el.yearInput.value = state.year;
+  renderWeeklyIssues = canEdit() ? weeklyRuleIssues() : new Map();
+  renderWeeklyNotifications = canEdit() ? weeklyRuleNotifications() : new Map();
   renderSelectors();
-  renderAgents();
-  renderLists();
+  if (currentPage === "admin" && canEdit()) {
+    renderAgents();
+    renderLists();
+  }
   renderCalendar();
   renderRules();
-  saveState();
+  renderWeeklyIssues = null;
+  renderWeeklyNotifications = null;
+}
+
+function renderScheduleUpdate(onlyWeekKey = null) {
+  if (!onlyWeekKey || currentPage !== "calendar" || !isVisibleWeekKey(onlyWeekKey)) {
+    render();
+    return;
+  }
+  renderWeeklyIssues = canEdit() ? weeklyRuleIssues() : new Map();
+  renderWeeklyNotifications = canEdit() ? weeklyRuleNotifications() : new Map();
+  refreshWeekBlock(onlyWeekKey, {
+    weeklyIssues: renderWeeklyIssues,
+    weeklyNotifications: renderWeeklyNotifications,
+  });
+  renderRules();
+  renderWeeklyIssues = null;
+  renderWeeklyNotifications = null;
 }
 
 function renderSelectors() {
@@ -1124,10 +1234,191 @@ function renderSimpleList(container, list, labeler, canRemoveItem = () => true) 
 }
 
 function renderCalendar() {
+  calendarRenderToken += 1;
+  const renderToken = calendarRenderToken;
   el.calendarView.innerHTML = "";
   const agents = visibleAgents();
-  const weeklyIssues = weeklyRuleIssues();
-  const weeklyNotifications = weeklyRuleNotifications();
+  const weeklyIssues = renderWeeklyIssues || (canEdit() ? weeklyRuleIssues() : new Map());
+  const weeklyNotifications = renderWeeklyNotifications || (canEdit() ? weeklyRuleNotifications() : new Map());
+  if (!agents.length) {
+    el.calendarView.innerHTML = `<article class="week-block empty-view"><p>No hay turnos personales asociados a este usuario.</p></article>`;
+    return;
+  }
+  const weeks = visibleWeeks();
+  let weekIndex = 0;
+  const renderNextWeek = () => {
+    if (renderToken !== calendarRenderToken) return;
+    const week = weeks[weekIndex];
+    if (!week) return;
+    el.calendarView.append(renderWeekBlock(week, weekIndex, agents, weeklyIssues, weeklyNotifications));
+    weekIndex += 1;
+    if (weekIndex < weeks.length) requestAnimationFrame(renderNextWeek);
+  };
+  renderNextWeek();
+}
+
+function renderWeekBlock(week, weekIndex, agents, weeklyIssues, weeklyNotifications, optionsOverride = {}) {
+  const weekKey = dateKey(week[0]);
+  const block = document.createElement("article");
+  block.className = "week-block";
+  block.dataset.weekKey = weekKey;
+  const canCollapse = isMonthlyView();
+  const collapsed = canCollapse && collapsedWeeks.has(weekKey) && !optionsOverride.forceExpanded;
+  if (collapsed) block.classList.add("collapsed-week");
+  block.innerHTML = `
+    <div class="week-title">
+      <h3>Semana ${formatDate(weekKey)}</h3>
+      <div class="week-actions">
+        <span>${shiftSummaryText()}</span>
+        <button class="week-export-pdf export-hidden" type="button">PDF</button>
+        ${canCollapse ? `<button class="week-toggle" type="button">${collapsed ? "Expandir" : "Colapsar"}</button>` : ""}
+      </div>
+    </div>
+  `;
+  block.querySelector(".week-export-pdf")?.addEventListener("click", () => {
+    const exportBlock = collapsed
+      ? renderWeekBlock(week, weekIndex, agents, weeklyIssues, weeklyNotifications, { forceExpanded: true })
+      : block;
+    exportWeekPdf(exportBlock, weekKey);
+  });
+  block.querySelector(".week-toggle")?.addEventListener("click", () => {
+    toggleWeekCollapse(weekKey);
+  });
+  if (collapsed) return block;
+
+  const body = document.createElement("div");
+  body.className = "week-body";
+  const weekMain = document.createElement("div");
+  weekMain.className = "week-main";
+  if (canEdit()) weekMain.classList.add("with-issues");
+  const tableWrap = document.createElement("div");
+  tableWrap.className = "week-table-wrap";
+  const issueColumn = document.createElement("aside");
+  issueColumn.className = "week-issues-column";
+  const issues = weeklyIssues.get(weekKey) || [];
+  const notifications = weeklyNotifications.get(weekKey) || [];
+  issueColumn.innerHTML = canEdit()
+    ? `
+      <p class="rule-message"><strong>Incongruencias de la semana:</strong></p>
+      ${
+        issues.length
+          ? issues.map((issue) => `<p class="rule-message">&bull; ${escapeHtml(issue)}</p>`).join("")
+          : '<p class="rule-message">Sin incongruencias.</p>'
+      }
+      ${
+        showWeeklyNotifications && notifications.length
+          ? `
+            <div class="week-notifications">
+              <p class="rule-message"><strong>Notificaciones:</strong></p>
+              ${notifications.map((notification) => `<p class="rule-message">&bull; ${escapeHtml(notification)}</p>`).join("")}
+            </div>
+          `
+          : ""
+      }
+      <button class="week-notification-toggle" type="button">${showWeeklyNotifications ? "Ocultar notificaciones" : "Mostrar notificaciones"}</button>
+      <button class="week-undo" type="button"${undoHistory.length ? "" : " disabled"}>Deshacer &uacute;ltimo cambio</button>
+      <button class="week-reset" type="button">Resetear semana</button>
+    `
+    : "";
+  issueColumn.querySelector(".week-notification-toggle")?.addEventListener("click", () => {
+    showWeeklyNotifications = !showWeeklyNotifications;
+    refreshVisibleWeekBlocks();
+  });
+  issueColumn.querySelector(".week-undo")?.addEventListener("click", undoLastChange);
+  issueColumn.querySelector(".week-reset")?.addEventListener("click", () => resetWeek(weekKey, week));
+  const table = document.createElement("table");
+  table.className = "schedule-table";
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>Tutor</th>
+        ${week.map((date) => `<th>${dayNames[isoDay(date) - 1]}<br>${formatDate(dateKey(date))}</th>`).join("")}
+      </tr>
+    </thead>
+    <tbody></tbody>
+  `;
+  const tbody = table.querySelector("tbody");
+  agents.forEach((agent) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td>${agentIdentityHtml(agent)}</td>`;
+    week.forEach((date) => {
+      const key = dateKey(date);
+      const cell = state.schedule[weekKey]?.[agent.id]?.[key] || { status: "A-onsite" };
+      const option = options[cell.status] || options["A-onsite"];
+      const td = document.createElement("td");
+      const button = document.createElement("button");
+      const expired = isExpiredDay(key);
+      const displayLabel = cell.note === "Asistencia obligatoria" ? "Asistencia obligatoria" : option.label;
+      const showLabel = cell.status !== "holiday";
+      const showLockedMark = canEdit() && (expired || cell.note === "Bloqueo recurrente" || cell.note === "Bloqueo manual") && !isClosedCell(cell);
+      button.className = `cell-btn ${option.className}${cell.note === "Asistencia obligatoria" ? " status-mandatory" : ""}${expired ? " expired-cell" : ""}`;
+      button.disabled = expired || !canEdit();
+      button.innerHTML = `
+        <strong>${option.code}${showLockedMark ? '<span class="locked-mark">Bloq.</span>' : ""}</strong>
+        ${showLabel ? `<span>${displayLabel}</span>` : ""}
+      `;
+      button.addEventListener("click", () => openCellEditor(weekKey, agent.id, key));
+      td.append(button);
+      row.append(td);
+    });
+    tbody.append(row);
+  });
+  tableWrap.append(table);
+  weekMain.append(tableWrap);
+  if (canEdit()) weekMain.append(issueColumn);
+  body.append(weekMain);
+  body.append(buildLegendNode("week-legend"));
+  block.append(body);
+  return block;
+}
+
+function toggleWeekCollapse(weekKey) {
+  if (collapsedWeeks.has(weekKey)) collapsedWeeks.delete(weekKey);
+  else collapsedWeeks.add(weekKey);
+  refreshWeekBlock(weekKey);
+}
+
+function refreshWeekBlock(weekKey, cache = {}) {
+  const weeks = visibleWeeks();
+  const weekIndex = weeks.findIndex((week) => dateKey(week[0]) === weekKey);
+  const agents = visibleAgents();
+  const currentBlock = [...el.calendarView.querySelectorAll(".week-block")].find((block) => block.dataset.weekKey === weekKey);
+  if (weekIndex < 0 || !agents.length || !currentBlock) {
+    renderCalendar();
+    return;
+  }
+  const weeklyIssues = cache.weeklyIssues || renderWeeklyIssues || (canEdit() ? weeklyRuleIssues() : new Map());
+  const weeklyNotifications = cache.weeklyNotifications || renderWeeklyNotifications || (canEdit() ? weeklyRuleNotifications() : new Map());
+  currentBlock.replaceWith(renderWeekBlock(weeks[weekIndex], weekIndex, agents, weeklyIssues, weeklyNotifications));
+}
+
+function refreshVisibleWeekBlocks() {
+  calendarRenderToken += 1;
+  const weeks = visibleWeeks();
+  const agents = visibleAgents();
+  const blocks = [...el.calendarView.querySelectorAll(".week-block[data-week-key]")];
+  if (!agents.length || blocks.length !== weeks.length) {
+    renderCalendar();
+    return;
+  }
+  const weeklyIssues = canEdit() ? weeklyRuleIssues() : new Map();
+  const weeklyNotifications = canEdit() ? weeklyRuleNotifications() : new Map();
+  weeks.forEach((week, weekIndex) => {
+    const weekKey = dateKey(week[0]);
+    const currentBlock = blocks.find((block) => block.dataset.weekKey === weekKey);
+    currentBlock?.replaceWith(renderWeekBlock(week, weekIndex, agents, weeklyIssues, weeklyNotifications));
+  });
+}
+
+function isVisibleWeekKey(weekKey) {
+  return visibleWeeks().some((week) => dateKey(week[0]) === weekKey);
+}
+
+function renderCalendarLegacy() {
+  el.calendarView.innerHTML = "";
+  const agents = visibleAgents();
+  const weeklyIssues = renderWeeklyIssues || weeklyRuleIssues();
+  const weeklyNotifications = renderWeeklyNotifications || weeklyRuleNotifications();
   if (!agents.length) {
     el.calendarView.innerHTML = `<article class="week-block empty-view"><p>No hay turnos personales asociados a este usuario.</p></article>`;
     return;
@@ -1186,7 +1477,7 @@ function renderCalendar() {
             : ""
         }
         <button class="week-notification-toggle" type="button">${showWeeklyNotifications ? "Ocultar notificaciones" : "Mostrar notificaciones"}</button>
-        <button class="week-undo" type="button"${undoHistory.length ? "" : " disabled"}>Deshacer último cambio</button>
+      <button class="week-undo" type="button"${undoHistory.length ? "" : " disabled"}>Deshacer &uacute;ltimo cambio</button>
         <button class="week-reset" type="button">Resetear semana</button>
       `
       : "";
@@ -1220,7 +1511,7 @@ function renderCalendar() {
         const expired = isExpiredDay(key);
         const displayLabel = cell.note === "Asistencia obligatoria" ? "Asistencia obligatoria" : option.label;
         const showLabel = cell.status !== "holiday";
-        const showLockedMark = (expired || cell.note === "Bloqueo recurrente" || cell.note === "Bloqueo manual") && !isClosedCell(cell);
+        const showLockedMark = canEdit() && (expired || cell.note === "Bloqueo recurrente" || cell.note === "Bloqueo manual") && !isClosedCell(cell);
         button.className = `cell-btn ${option.className}${cell.note === "Asistencia obligatoria" ? " status-mandatory" : ""}${expired ? " expired-cell" : ""}`;
         button.disabled = expired || !canEdit();
         button.innerHTML = `
@@ -1237,9 +1528,25 @@ function renderCalendar() {
     weekMain.append(tableWrap);
     if (canEdit()) weekMain.append(issueColumn);
     body.append(weekMain);
+    body.append(buildLegendNode("week-legend"));
     block.append(body);
     el.calendarView.append(block);
   });
+}
+
+function buildLegendNode(extraClass = "") {
+  const legend = document.createElement("section");
+  legend.className = `legend${extraClass ? ` ${extraClass}` : ""}`;
+  legend.innerHTML = `
+    <span><i class="swatch onsite"></i>Disponible presencial</span>
+    <span><i class="swatch remote"></i>Remoto</span>
+    <span><i class="swatch admin"></i>Administrativo</span>
+    <span><i class="swatch medical"></i>Licencia médica</span>
+    <span><i class="swatch union"></i>Salida sindicato</span>
+    <span><i class="swatch holiday"></i>Feriado</span>
+    <span><i class="swatch recess"></i>Receso institucional</span>
+  `;
+  return legend;
 }
 
 function visibleWeeks() {
@@ -1296,14 +1603,18 @@ function renderRules() {
     return;
   }
   const issues = validateRules();
-  const permanentMedical = permanentMedicalAgents();
-  el.rulesPanel.className = `rules-panel ${issues.length ? "warn" : "ok"}`;
+  el.rulesPanel.className = `rules-panel rules-summary ${issues.length ? "warn" : "ok"}`;
   el.rulesPanel.innerHTML = `
-    <p class="rule-message"><strong>Reglas vigentes:</strong> el cálculo se resuelve por semana; cada agente activo debe tener 2 remotos semanales, o 1 remoto cuando la semana queda con solo 3 días laborales. Los viernes B presenciales rotan por vuelta antes de volver a repetirse.</p>
-    <p class="rule-message"><strong>Cobertura diaria:</strong> cada día hábil mantiene al menos un tutor presencial en turno A y uno presencial en turno B, respetando bloqueos, ausencias y ajustes manuales.</p>
-    <p class="rule-message"><strong>Salida sindicato:</strong> descuenta las últimas dos horas de la jornada, pero cuenta dentro del total del turno y modalidad asignados.</p>
-    ${permanentMedical.length ? `<p class="rule-message"><strong>Estados permanentes:</strong> Licencia médica indefinida: ${permanentMedical.map((agent) => escapeHtml(agent.name)).join(", ")}.</p>` : ""}
-    ${issues.length ? '<p class="rule-message"><strong>Incongruencias:</strong> revisa el detalle bajo cada semana desplegada.</p>' : ""}
+    <div class="rules-summary-copy">
+      <p class="rule-message"><strong>Resumen del calendario:</strong> Organiza los turnos semanales del equipo seg&uacute;n mes, feriados, ausencias y bloqueos definidos.</p>
+      <p class="rule-message">Cada celda representa un bloque diario completo con tutor, turno, modalidad o estado especial.</p>
+      <p class="rule-message">El c&aacute;lculo prioriza cobertura presencial en A y B, distribuyendo remotos y turnos B de manera proporcional.</p>
+      <p class="rule-message">Los d&iacute;as vencidos quedan bloqueados y los ajustes manuales se respetan en los rec&aacute;lculos posteriores.</p>
+      <p class="rule-message">Las incongruencias se informan bajo cada semana para apoyar la decisi&oacute;n operativa sin impedir la edici&oacute;n.</p>
+    </div>
+    <div class="rules-summary-action">
+      <a class="rules-manual-link" href="reglas-vigentes.html">Ver todas las reglas vigentes</a>
+    </div>
   `;
 }
 
@@ -1383,20 +1694,66 @@ function weeklyRuleIssues() {
     if (issues.length) byWeek.set(weekKey, issues);
   });
 
-  const activeFridayAgents = state.agents.filter((agent) => monthFridayWeek.has(agent.id));
-  const minFridayCount = activeFridayAgents.length ? Math.min(...activeFridayAgents.map((agent) => monthFridayB.get(agent.id) || 0)) : 0;
-  const maxFridayCount = minFridayCount < 2 ? 2 : minFridayCount + 1;
-  activeFridayAgents.forEach((agent) => {
-    const fridayCount = monthFridayB.get(agent.id) || 0;
-    if (fridayCount > maxFridayCount) {
-      const weekKey = monthFridayWeek.get(agent.id);
-      const issues = byWeek.get(weekKey) || [];
-      issues.push(`${agent.name}: tiene ${fridayCount} viernes B presencial durante ${monthNames[state.month]}; no debe volver a tocarle hasta que el resto complete la vuelta.`);
-      byWeek.set(weekKey, issues);
-    }
-  });
+  addMonthlyFridayRotationIssues(byWeek);
 
   return byWeek;
+}
+
+function addMonthlyFridayRotationIssues(byWeek) {
+  const assignments = monthlyFridayAssignments(state.schedule);
+  const fridayKeys = [...new Set(assignments.map((item) => item.dayKey))].sort();
+  const activeAgents = state.agents.filter((agent) => assignments.some((item) => item.agent.id === agent.id && isEditableWorkCell(item.cell)));
+  if (!fridayKeys.length || !activeAgents.length) return;
+
+  const activeIds = new Set(activeAgents.map((agent) => agent.id));
+  const counts = new Map(activeAgents.map((agent) => [agent.id, 0]));
+  const seen = new Set();
+
+  fridayKeys.forEach((dayKey) => {
+    const weekKey = assignments.find((item) => item.dayKey === dayKey)?.weekKey || dayKey;
+    const fridayB = assignments.filter((item) => item.dayKey === dayKey && activeIds.has(item.agent.id) && isOnsiteShift(item.cell, "B"));
+    if (!fridayB.length) {
+      const issues = byWeek.get(weekKey) || [];
+      issues.push(`${dayNames[4]} ${formatDate(dayKey)}: debe existir un tutor en viernes B presencial.`);
+      byWeek.set(weekKey, issues);
+      return;
+    }
+
+    fridayB.forEach((item) => {
+      if (seen.has(item.agent.id) && seen.size < activeAgents.length) {
+        const issues = byWeek.get(weekKey) || [];
+        issues.push(`${item.agent.name}: repite viernes B presencial antes de que todos los tutores activos tengan uno en ${monthNames[state.month]}.`);
+        byWeek.set(weekKey, issues);
+      }
+      seen.add(item.agent.id);
+      counts.set(item.agent.id, (counts.get(item.agent.id) || 0) + 1);
+    });
+  });
+
+  if (fridayKeys.length >= activeAgents.length) {
+    activeAgents.forEach((agent) => {
+      if ((counts.get(agent.id) || 0) > 0) return;
+      const weekKey = monthFridayWeekForAgent(assignments, agent.id) || assignments.find((item) => item.dayKey === fridayKeys[0])?.weekKey || fridayKeys[0];
+      const issues = byWeek.get(weekKey) || [];
+      issues.push(`${agent.name}: no tiene viernes B presencial durante ${monthNames[state.month]}; debe completar la vuelta mensual antes de repetir otro tutor.`);
+      byWeek.set(weekKey, issues);
+    });
+  }
+
+  const maxAllowed = Math.ceil(fridayKeys.length / activeAgents.length);
+  activeAgents.forEach((agent) => {
+    const fridayCount = counts.get(agent.id) || 0;
+    if (fridayCount <= maxAllowed) return;
+    const weekKey = monthFridayWeekForAgent(assignments, agent.id) || assignments.find((item) => item.dayKey === fridayKeys[0])?.weekKey || fridayKeys[0];
+    const issues = byWeek.get(weekKey) || [];
+    issues.push(`${agent.name}: tiene ${fridayCount} viernes B presencial durante ${monthNames[state.month]}; supera la vuelta proporcional mensual.`);
+    byWeek.set(weekKey, issues);
+  });
+}
+
+function monthFridayWeekForAgent(assignments, agentId) {
+  const assignment = assignments.find((item) => item.agent.id === agentId && isOnsiteShift(item.cell, "B"));
+  return assignment?.weekKey || "";
 }
 
 function weeklyRuleNotifications() {
@@ -1454,7 +1811,7 @@ function addShortDayDistributionIssues(issues, weekKey, week) {
 
 function validateRules() {
   const issues = [];
-  weeklyRuleIssues().forEach((weekIssues) => issues.push(...weekIssues));
+  (renderWeeklyIssues || weeklyRuleIssues()).forEach((weekIssues) => issues.push(...weekIssues));
   return issues.slice(0, 20);
 }
 function openCellEditor(weekKey, agentId, dayKey) {
@@ -1606,19 +1963,17 @@ function resetWeek(weekKey, week) {
     const dayKey = dateKey(date);
     state.agents.forEach((agent) => {
       const cell = state.schedule[weekKey]?.[agent.id]?.[dayKey];
-      if (!cell || isProtectedResetCell(cell)) return;
+      if (!cell || isProtectedResetCell(cell, dayKey)) return;
       const overrideKey = `${weekKey}|${agent.id}|${dayKey}`;
-      const resetCell = { status: "assign", locked: false, note: "", source: "manual" };
-      state.schedule[weekKey][agent.id][dayKey] = { ...resetCell };
-      state.manualOverrides[overrideKey] = { ...resetCell };
+      delete state.manualOverrides[overrideKey];
     });
   });
-  saveState();
-  render();
+  generateSchedule(weekKey);
 }
 
-function isProtectedResetCell(cell) {
+function isProtectedResetCell(cell, dayKey = "") {
   return (
+    isExpiredDay(dayKey) ||
     cell.status === "medical" ||
     isClosedCell(cell) ||
     cell.note === "Asistencia obligatoria" ||
@@ -1656,9 +2011,17 @@ function exportWeekPdf(weekBlock, weekKey) {
         <style>
           body { margin: 14px; background: #fff; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          .week-export-sheet { position: static !important; width: 100% !important; }
-          .export-hidden, .week-issues-column { display: none !important; }
+          .export-pdf-header, .week-block {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+          }
+          .export-hidden, .week-toggle, .week-issues-column { display: none !important; }
           .week-main.with-issues { grid-template-columns: minmax(0, 1fr) !important; }
+          .week-table-wrap { overflow: visible !important; width: 100% !important; }
+          .schedule-table { width: 100% !important; min-width: 0 !important; }
+          .schedule-table th, .schedule-table td { padding: 6px !important; font-size: 11px !important; }
+          .schedule-table th:first-child, .schedule-table td:first-child { width: 22% !important; }
           @page { size: landscape; margin: 10mm; }
         </style>
       </head>
@@ -1675,13 +2038,25 @@ function exportWeekPdf(weekBlock, weekKey) {
 function buildWeekExportNode(weekBlock) {
   const wrapper = document.createElement("section");
   wrapper.className = "week-export-sheet";
-  const legend = document.querySelector(".legend")?.cloneNode(true);
   const clone = weekBlock.cloneNode(true);
   clone.classList.remove("collapsed-week");
-  clone.querySelectorAll(".export-hidden").forEach((node) => node.remove());
-  if (legend) wrapper.append(legend);
+  clone.querySelectorAll(".export-hidden, .week-toggle").forEach((node) => node.remove());
+  clone.querySelectorAll(".locked-mark").forEach((node) => node.remove());
+  wrapper.append(buildExportHeaderNode());
   wrapper.append(clone);
   return wrapper;
+}
+
+function buildExportHeaderNode() {
+  const header = document.createElement("header");
+  header.className = "topbar export-pdf-header";
+  header.innerHTML = `
+    <div>
+      <p class="eyebrow">Dirección de Transformación Digital Educativa DTDE</p>
+      <h1>Equipo de Tutoría y Acompañamiento</h1>
+    </div>
+  `;
+  return header;
 }
 
 function collectPageStyles(asText = false) {
@@ -1869,7 +2244,7 @@ function workbookRelsXml() {
 }
 
 function workbookStylesXml() {
-  const fills = ["FFFFFF", "EEF1F7", "CFE5FF", "90ABC4", "F6EFE0", "D8E1EA", "818F9F", "B7C4D1", "F4F6FA"];
+  const fills = ["FFFFFF", "EEF1F7", "CFE5FF", "6F93B3", "EAD7AA", "004680", "818F9F", "002147", "0072E5", "F4F6FA"];
   const fillXml = [
     '<fill><patternFill patternType="none"/></fill>',
     '<fill><patternFill patternType="gray125"/></fill>',
@@ -1883,22 +2258,23 @@ function workbookStylesXml() {
     { fill: 2, border: 1, font: 1 },
     { fill: 5, border: 1, font: 1 },
     { fill: 6, border: 1, font: 1 },
-    { fill: 7, border: 1, font: 1 },
+    { fill: 7, border: 1, font: 2 },
     { fill: 6, border: 1, font: 1 },
     { fill: 8, border: 1, font: 1 },
-    { fill: 9, border: 1, font: 1 },
-    { fill: 4, border: 1, font: 1 },
+    { fill: 9, border: 1, font: 2 },
+    { fill: 10, border: 1, font: 2 },
     { fill: 3, border: 1, font: 1, wrap: true },
     { fill: 2, border: 1, font: 1 },
     { fill: 2, border: 0 },
     { fill: 2, border: 1 },
-    { fill: 10, border: 1, font: 1 },
+    { fill: 11, border: 1, font: 1 },
   ];
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
   <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-    <fonts count="2">
+    <fonts count="3">
       <font><sz val="12"/><name val="Calibri"/></font>
       <font><b/><sz val="12"/><name val="Calibri"/></font>
+      <font><b/><sz val="12"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
     </fonts>
     <fills count="${fills.length + 2}">${fillXml}</fills>
     <borders count="2">

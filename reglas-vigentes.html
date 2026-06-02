@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reglas vigentes | Planificador Turnos Tutor&iacute;a</title>
+    <link rel="stylesheet" href="styles.css?v=manual-color-fixes-20260601" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Direcci&oacute;n de Transformaci&oacute;n Digital Educativa DTDE</p>
+        <h1>Equipo de Tutor&iacute;a y Acompa&ntilde;amiento</h1>
+      </div>
+      <div class="admin-pill manual-session">
+        <div class="session-text">
+          <span id="manualSessionRole">Sesi&oacute;n interna</span>
+          <strong id="manualSessionName">Usuario</strong>
+        </div>
+        <button id="manualLogoutBtn" class="logout-button" type="button">Salir</button>
+      </div>
+    </header>
+
+    <main class="manual-shell">
+      <section class="manual-hero panel">
+        <p class="eyebrow">Reglamento operativo</p>
+        <h2>Reglas vigentes del calendario de turnos</h2>
+        <p>
+          Este manual documenta los criterios que usa el planificador para sugerir, validar y advertir
+          incongruencias en los horarios del Equipo de Tutor&iacute;a y Acompa&ntilde;amiento. La edici&oacute;n manual
+          siempre queda permitida para Cristopher, pero el sistema informa cuando una decisi&oacute;n rompe
+          alguna regla de proporcionalidad, cobertura o disponibilidad.
+        </p>
+        <div class="manual-actions">
+          <a class="primary link-button" href="index.html">Abrir calendario</a>
+          <a class="ghost link-button" href="#edicion-manual">Ver protocolo de edici&oacute;n</a>
+        </div>
+      </section>
+
+      <section class="manual-layout">
+        <nav class="manual-toc panel" aria-label="Indice de reglas">
+          <strong>Contenido</strong>
+          <a href="#alcance">1. Alcance</a>
+          <a href="#perfiles">2. Perfiles</a>
+          <a href="#jornadas">3. Jornadas y turnos</a>
+          <a href="#estados">4. Estados disponibles</a>
+          <a href="#calculo">5. C&aacute;lculo autom&aacute;tico</a>
+          <a href="#reglas">6. Reglas de validaci&oacute;n</a>
+          <a href="#ausencias">7. Ausencias</a>
+          <a href="#bloqueos">8. Bloqueos</a>
+          <a href="#edicion-manual">9. Edici&oacute;n manual</a>
+          <a href="#mensajes">10. Mensajes</a>
+          <a href="#exportacion">11. Exportaci&oacute;n</a>
+          <a href="#buenas-practicas">12. Buenas pr&aacute;cticas</a>
+        </nav>
+
+        <div class="manual-content">
+          <section id="alcance" class="manual-section panel">
+            <h3>1. Alcance del calendario</h3>
+            <p>
+              El planificador organiza turnos semanales por mes calendario para cinco tutores por defecto:
+              Monserrat Vargas, Viviana Brice&ntilde;o, Fernando Garc&iacute;a, Denisse Bravo y Denisse Rossel.
+              La configuraci&oacute;n permite editar nombres, ausencias, feriados, recesos, asistencias obligatorias
+              y bloqueos recurrentes.
+            </p>
+            <p>
+              La herramienta no divide la jornada por hora. Cada celda representa un bloque diario completo:
+              tutor, fecha, turno y modalidad. La excepci&oacute;n conceptual es salida sindicato, que descuenta
+              las dos &uacute;ltimas horas de la jornada, pero se mantiene asociada al turno y modalidad del d&iacute;a.
+            </p>
+          </section>
+
+          <section id="perfiles" class="manual-section panel">
+            <h3>2. Perfiles de usuario</h3>
+            <table class="manual-table">
+              <thead>
+                <tr>
+                  <th>Perfil</th>
+                  <th>Uso esperado</th>
+                  <th>Permisos</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Administrador</td>
+                  <td>Cristopher Calabr&aacute;n</td>
+                  <td>Edita calendario, tutores, ausencias, bloqueos, feriados, recesos, claves y fotograf&iacute;a de perfil.</td>
+                </tr>
+                <tr>
+                  <td>Tutores</td>
+                  <td>Equipo de Tutor&iacute;a y Acompa&ntilde;amiento</td>
+                  <td>Ven sus turnos y el calendario disponible seg&uacute;n el acceso configurado. No editan bloques.</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section id="jornadas" class="manual-section panel">
+            <h3>3. Jornadas laborales y turnos</h3>
+            <p>El calendario considera d&iacute;as h&aacute;biles de lunes a viernes y usa los siguientes bloques:</p>
+            <table class="manual-table compact">
+              <thead>
+                <tr>
+                  <th>D&iacute;a</th>
+                  <th>Horario operativo</th>
+                  <th>Turno A</th>
+                  <th>Turno B</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Lunes y martes</td>
+                  <td>08:30 a 20:30</td>
+                  <td>08:30 a 18:30</td>
+                  <td>10:30 a 20:30</td>
+                </tr>
+                <tr>
+                  <td>Mi&eacute;rcoles a viernes</td>
+                  <td>08:30 a 19:30</td>
+                  <td>08:30 a 17:30</td>
+                  <td>10:30 a 19:30</td>
+                </tr>
+              </tbody>
+            </table>
+            <p>
+              El s&aacute;bado no se usa para c&aacute;lculo operativo de turnos. En exportaciones puede aparecer como
+              referencia visual si el dise&ntilde;o de salida lo requiere, pero no exige cobertura.
+            </p>
+          </section>
+
+          <section id="estados" class="manual-section panel">
+            <h3>4. Estados disponibles por bloque</h3>
+            <div class="status-list">
+              <span class="status-item onsite"><i class="swatch onsite"></i> Turno A presencial</span>
+              <span class="status-item onsite"><i class="swatch onsite"></i> Turno B presencial</span>
+              <span class="status-item remote"><i class="swatch remote"></i> Turno A remoto</span>
+              <span class="status-item remote"><i class="swatch remote"></i> Turno B remoto</span>
+              <span class="status-item admin"><i class="swatch admin"></i> Administrativo</span>
+              <span class="status-item admin"><i class="swatch admin"></i> ADM A ma&ntilde;ana</span>
+              <span class="status-item admin"><i class="swatch admin"></i> ADM B tarde</span>
+              <span class="status-item medical"><i class="swatch medical"></i> Licencia m&eacute;dica</span>
+              <span class="status-item union"><i class="swatch union"></i> Salida sindicato</span>
+              <span class="status-item holiday"><i class="swatch holiday"></i> Feriado</span>
+              <span class="status-item recess"><i class="swatch recess"></i> Receso institucional</span>
+            </div>
+            <p>
+              Los estados administrativo y licencia m&eacute;dica se consideran ausencia para efectos de dotaci&oacute;n.
+              Feriado y receso cierran el d&iacute;a para el c&aacute;lculo. Asistencia obligatoria fuerza presencialidad
+              y no exige remoto en ese d&iacute;a.
+            </p>
+          </section>
+
+          <section id="calculo" class="manual-section panel">
+            <h3>5. C&oacute;mo calcula el sistema</h3>
+            <ol>
+              <li>Lee el mes, a&ntilde;o, tutores activos, feriados, recesos, ausencias y bloqueos.</li>
+              <li>Construye las semanas visibles del mes.</li>
+              <li>Marca primero los d&iacute;as cerrados, licencias m&eacute;dicas, administrativos y bloqueos recurrentes.</li>
+              <li>Asigna turnos A y B buscando una distribuci&oacute;n proporcional.</li>
+              <li>Asigna remotos respetando cobertura presencial diaria.</li>
+              <li>Ajusta viernes B presencial con rotaci&oacute;n mensual.</li>
+              <li>Aplica ajustes manuales guardados por Cristopher.</li>
+              <li>Bloquea d&iacute;as vencidos para que no sean movidos por un rec&aacute;lculo posterior.</li>
+              <li>Valida reglas y muestra incongruencias sin impedir la edici&oacute;n manual.</li>
+            </ol>
+          </section>
+
+          <section id="reglas" class="manual-section panel">
+            <h3>6. Reglas de validaci&oacute;n vigentes</h3>
+            <h4>Remotos semanales</h4>
+            <p>
+              Cada tutor activo debe tener 2 d&iacute;as remotos por semana. Si una semana queda reducida a 3 d&iacute;as
+              laborales o menos por feriados, recesos o cierres, el objetivo baja a 1 remoto proporcional.
+            </p>
+            <h4>Turnos B</h4>
+            <p>
+              El sistema distribuye turnos B semanalmente de forma proporcional entre tutores activos. El rango
+              esperado puede variar si hay ausencias, feriados, recesos o bloqueos que reduzcan la dotaci&oacute;n real.
+            </p>
+            <h4>Cobertura presencial diaria</h4>
+            <p>
+              Todo d&iacute;a h&aacute;bil abierto debe mantener al menos un tutor presencial en turno A y al menos un tutor
+              presencial en turno B. Esta regla se valida incluso si hay remotos o ajustes manuales.
+            </p>
+            <h4>Remotos por turno</h4>
+            <p>
+              Para evitar dejar un turno sin presencia, el sistema permite como m&aacute;ximo un remoto por turno cuando
+              existe capacidad suficiente. Si hay pocos tutores activos, prioriza cobertura presencial.
+            </p>
+            <h4>Viernes B presencial</h4>
+            <p>
+              Cada viernes abierto debe tener un tutor en B presencial. La asignaci&oacute;n rota durante el mes:
+              un tutor no deber&iacute;a repetir viernes B presencial hasta que todos los tutores activos hayan tenido
+              uno. Si hay m&aacute;s viernes que tutores activos, la repetici&oacute;n se permite solo despu&eacute;s de completar
+              la vuelta mensual.
+            </p>
+            <h4>Salida sindicato</h4>
+            <p>
+              Salida sindicato solo aplica para Denisse Bravo y Monserrat Vargas. Puede combinarse con A/B y
+              presencial/remoto. Cuenta dentro del turno asignado, pero representa salida anticipada de las dos
+              &uacute;ltimas horas de esa jornada.
+            </p>
+          </section>
+
+          <section id="ausencias" class="manual-section panel">
+            <h3>7. Ausencias y estados especiales</h3>
+            <p>
+              Las ausencias reducen la dotaci&oacute;n disponible y obligan al sistema a redistribuir las reglas entre
+              el resto del equipo activo. Si la dotaci&oacute;n restante no permite cumplir todas las reglas, se informa
+              una incongruencia visible.
+            </p>
+            <ul>
+              <li><strong>D&iacute;a administrativo:</strong> bloque ausente completo.</li>
+              <li><strong>ADM A ma&ntilde;ana:</strong> ausencia parcial asociada al tramo A.</li>
+              <li><strong>ADM B tarde:</strong> ausencia parcial asociada al tramo B.</li>
+              <li><strong>Licencia m&eacute;dica:</strong> puede tener fecha desde, fecha hasta o quedar indefinida.</li>
+              <li><strong>Feriado:</strong> cierra el d&iacute;a y se despliega en gris.</li>
+              <li><strong>Receso institucional:</strong> cierra el d&iacute;a como evento institucional.</li>
+              <li><strong>Asistencia obligatoria:</strong> fuerza presencialidad del equipo disponible.</li>
+            </ul>
+          </section>
+
+          <section id="bloqueos" class="manual-section panel">
+            <h3>8. Bloqueos recurrentes y d&iacute;as vencidos</h3>
+            <p>
+              Los bloqueos recurrentes permiten reservar una preferencia estable para un tutor, por ejemplo
+              mantener remoto los martes y jueves. El c&aacute;lculo intenta respetar esa condici&oacute;n y redistribuir
+              el resto del calendario para conservar proporcionalidad.
+            </p>
+            <p>
+              Los d&iacute;as pasados quedan bloqueados al finalizar el d&iacute;a, desde las 23:59 horas. Esto evita que un
+              cambio realizado a mitad de semana reprograme turnos ya ejecutados.
+            </p>
+          </section>
+
+          <section id="edicion-manual" class="manual-section panel">
+            <h3>9. Protocolo de edici&oacute;n manual</h3>
+            <ol>
+              <li>Cristopher abre el calendario con perfil administrador.</li>
+              <li>Selecciona el mes y vista de trabajo: mes completo, semana o vista personal.</li>
+              <li>Hace clic sobre el bloque del tutor y d&iacute;a que necesita modificar.</li>
+              <li>Selecciona el estado del bloque: A presencial, B presencial, remoto, administrativo, licencia, feriado, receso o sindicato.</li>
+              <li>Guarda el cambio. El sistema recalcula manteniendo el ajuste manual como prioridad.</li>
+              <li>Revisa el panel de incongruencias de la semana.</li>
+              <li>Si la necesidad operativa justifica la incongruencia, puede mantener el cambio de todos modos.</li>
+            </ol>
+            <div class="manual-callout">
+              La herramienta acompa&ntilde;a la decisi&oacute;n, no la bloquea. La regla principal es informar claramente
+              qu&eacute; queda fuera de cumplimiento para que Cristopher pueda decidir con contexto.
+            </div>
+          </section>
+
+          <section id="mensajes" class="manual-section panel">
+            <h3>10. Mensajes de incongruencia</h3>
+            <p>Los mensajes visibles bajo cada semana indican problemas como:</p>
+            <ul>
+              <li>Un tutor tiene m&aacute;s o menos remotos que los esperados.</li>
+              <li>Un tutor tiene m&aacute;s o menos turnos B que el rango proporcional.</li>
+              <li>No existe cobertura presencial A y B en un d&iacute;a h&aacute;bil abierto.</li>
+              <li>Hay remotos excesivos dentro del mismo turno.</li>
+              <li>No hay dotaci&oacute;n suficiente por licencias, administrativos, feriados o recesos.</li>
+              <li>Un tutor repite viernes B presencial antes de completar la vuelta mensual.</li>
+              <li>Salida sindicato fue asignada a una persona no habilitada.</li>
+            </ul>
+          </section>
+
+          <section id="exportacion" class="manual-section panel">
+            <h3>11. Exportaci&oacute;n y visualizaci&oacute;n</h3>
+            <p>
+              El calendario se puede revisar por mes y por semana. La exportaci&oacute;n PDF usa el encabezado DTDE,
+              calendario y leyenda como un bloque contra&iacute;ble por semana. La exportaci&oacute;n Excel mantiene el dise&ntilde;o
+              operativo con colores de la paleta institucional.
+            </p>
+            <p>
+              En exportaciones no se muestra la marca interna de bloqueo. El objetivo es que los tutores reciban
+              una salida limpia, entendible y enfocada en turnos, modalidad y estados.
+            </p>
+          </section>
+
+          <section id="buenas-practicas" class="manual-section panel">
+            <h3>12. Buenas pr&aacute;cticas para Cristopher</h3>
+            <ul>
+              <li>Revisar primero ausencias, feriados y recesos antes de generar o recalcular un mes.</li>
+              <li>Usar bloqueos recurrentes solo para restricciones estables, no para cambios puntuales.</li>
+              <li>Cuando se edite a mitad de semana, confirmar que los d&iacute;as vencidos se mantengan bloqueados.</li>
+              <li>Revisar las incongruencias semana por semana antes de exportar.</li>
+              <li>Registrar licencias m&eacute;dicas indefinidas cuando no exista fecha de t&eacute;rmino conocida.</li>
+              <li>Usar resetear semana solo cuando se quiera limpiar ajustes manuales no protegidos de esa semana.</li>
+            </ul>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <button id="manualBackTopBtn" class="back-top-button" type="button" aria-label="Volver arriba">Volver arriba</button>
+    <script src="reglas-vigentes.js?v=rules-backtop-20260602"></script>
+  </body>
+</html>
