@@ -761,69 +761,26 @@ select {
 .status-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px 14px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .status-list span {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
-  padding: 8px 10px;
-  border: 1px solid var(--status-item-border, var(--line));
-  border-radius: 6px;
-  background: var(--status-item-bg, #fff);
-  color: var(--status-item-text, var(--muted));
-  font-size: 13px;
+  min-height: 32px;
   font-weight: 700;
 }
 
-.status-item.onsite {
-  --status-item-bg: var(--status-onsite-bg);
-  --status-item-border: var(--status-onsite-border);
-  --status-item-text: var(--status-onsite-text);
-}
-
-.status-item.remote {
-  --status-item-bg: var(--status-remote-bg);
-  --status-item-border: var(--status-remote-border);
-  --status-item-text: var(--status-remote-text);
-}
-
-.status-item.admin {
-  --status-item-bg: var(--status-admin-bg);
-  --status-item-border: var(--status-admin-border);
-  --status-item-text: var(--status-admin-text);
-}
-
-.status-item.medical {
-  --status-item-bg: var(--status-medical-bg);
-  --status-item-border: var(--status-medical-border);
-  --status-item-text: var(--status-medical-text);
-}
-
-.status-item.union {
-  --status-item-bg: var(--status-union-bg);
-  --status-item-border: var(--status-union-border);
-  --status-item-text: var(--status-union-text);
-  box-shadow: inset 5px 0 0 var(--ucen-bright-blue);
-}
-
-.status-item.holiday {
-  --status-item-bg: var(--status-holiday-bg);
-  --status-item-border: var(--status-holiday-border);
-  --status-item-text: var(--status-holiday-text);
-}
-
-.status-item.recess {
-  --status-item-bg: var(--status-recess-bg);
-  --status-item-border: var(--status-recess-border);
-  --status-item-text: var(--status-recess-text);
-}
-
-.status-item.medical .swatch,
-.status-item.recess .swatch {
-  border-color: rgba(255, 255, 255, 0.72);
+.status-list .swatch {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 5px;
 }
 
 .manual-callout {
