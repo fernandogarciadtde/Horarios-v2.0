@@ -26,8 +26,10 @@ if errorlevel 1 (
 :iniciar_app
 echo.
 echo Iniciando app local en http://127.0.0.1:4174
+echo Abriendo navegador automaticamente...
 echo Para cerrar el servidor usa Ctrl+C en esta ventana.
 echo.
+start "" powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command "Start-Sleep -Seconds 2; Start-Process 'http://127.0.0.1:4174'"
 python local_server.py
 if errorlevel 1 (
   echo.
