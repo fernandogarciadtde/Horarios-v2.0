@@ -164,19 +164,36 @@ a.ghost.link-button:hover {
 }
 
 .admin-pill {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
-  gap: 8px;
+  display: flex;
   align-items: center;
+  gap: 14px;
   padding: 10px 14px;
   border: 1px solid rgba(255, 255, 255, 0.32);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.08);
 }
 
+.session-identity {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding-right: 16px;
+  border-right: 1px solid rgba(255, 255, 255, 0.26);
+}
+
 .session-text {
   display: grid;
   gap: 3px;
+  min-width: 0;
+}
+
+.session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
 
 .logout-button {
@@ -1316,9 +1333,21 @@ dialog::backdrop {
     font-size: 23px;
   }
 
-  .manual-session,
   .admin-pill {
-    grid-template-columns: 1fr;
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .session-identity {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding-right: 0;
+    padding-bottom: 10px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.26);
+  }
+
+  .session-actions {
     width: 100%;
   }
 

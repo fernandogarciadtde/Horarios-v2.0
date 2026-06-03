@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Planificador Turnos Tutoría | DTDE</title>
-    <link rel="stylesheet" href="styles.css?v=center-rules-link-20260602" />
+    <link rel="stylesheet" href="styles.css?v=session-panel-groups-20260602" />
   </head>
   <body>
     <header class="topbar">
@@ -13,16 +13,20 @@
         <h1>Equipo de Tutoría y Acompañamiento</h1>
       </div>
       <div class="admin-pill">
-        <div id="sessionAvatar" class="profile-avatar"><span>U</span></div>
-        <div class="session-text">
-          <span id="sessionRole">Administrador</span>
-          <strong id="sessionName">Usuario</strong>
+        <div class="session-identity">
+          <div id="sessionAvatar" class="profile-avatar"><span>U</span></div>
+          <div class="session-text">
+            <span id="sessionRole">Administrador</span>
+            <strong id="sessionName">Usuario</strong>
+          </div>
         </div>
-        <button id="adminNavBtn" class="logout-button" hidden>Administracion</button>
-        <button id="passwordBtn" class="logout-button">Contraseña</button>
-        <input id="profilePhotoInput" class="visually-hidden" type="file" accept="image/*" />
-        <button id="profilePhotoBtn" class="logout-button">Foto</button>
-        <button id="logoutBtn" class="logout-button">Salir</button>
+        <div class="session-actions">
+          <button id="adminNavBtn" class="logout-button" hidden>Administracion</button>
+          <button id="passwordBtn" class="logout-button">Contraseña</button>
+          <input id="profilePhotoInput" class="visually-hidden" type="file" accept="image/*" />
+          <button id="profilePhotoBtn" class="logout-button">Foto</button>
+          <button id="logoutBtn" class="logout-button">Salir</button>
+        </div>
       </div>
     </header>
 
