@@ -372,7 +372,7 @@ a.ghost.link-button:hover {
 
 .calendar-control-row {
   display: grid;
-  grid-template-columns: minmax(600px, 3fr) minmax(320px, 2fr);
+  grid-template-columns: minmax(440px, 2fr) minmax(0, 3fr);
   gap: 14px;
   align-items: stretch;
   margin-bottom: 12px;
@@ -399,14 +399,19 @@ a.ghost.link-button:hover {
 
 .period-fields {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: minmax(88px, 0.8fr) minmax(76px, 0.7fr) minmax(116px, 1fr) minmax(128px, 1fr);
+  gap: 8px;
   align-items: stretch;
 }
 
 .period-fields label {
   width: 100%;
   margin-bottom: 0;
+}
+
+.period-fields select,
+.period-fields input {
+  min-width: 0;
 }
 
 #weekSelectLabel {
@@ -608,7 +613,7 @@ select {
 }
 
 .rules-summary {
-  grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr);
+  grid-template-columns: minmax(0, 3fr) minmax(170px, 1fr);
   gap: 12px;
   align-items: stretch;
   padding: 12px var(--side-space);
