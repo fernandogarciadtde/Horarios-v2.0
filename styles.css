@@ -1112,6 +1112,12 @@ select {
   font-size: 13px;
 }
 
+.cell-btn.status-holiday,
+.cell-btn.status-recess,
+.cell-btn.status-mandatory {
+  align-content: center;
+}
+
 .cell-btn.status-admin:hover,
 .cell-btn.status-admin-partial:hover,
 .cell-btn.status-medical:hover,
