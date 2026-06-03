@@ -392,6 +392,10 @@ a.ghost.link-button:hover {
   margin-bottom: 0;
 }
 
+#weekSelectLabel {
+  grid-column: 3;
+}
+
 .period-panel .button-row {
   justify-content: flex-start;
 }
@@ -1283,6 +1287,10 @@ dialog::backdrop {
 
   .period-fields {
     grid-template-columns: 1fr 1fr;
+  }
+
+  #weekSelectLabel {
+    grid-column: auto;
   }
 
   .week-block {
