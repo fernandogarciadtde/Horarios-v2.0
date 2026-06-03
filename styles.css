@@ -1108,6 +1108,17 @@ select {
   font-size: 13px;
 }
 
+.cell-btn.status-admin:hover,
+.cell-btn.status-admin-partial:hover,
+.cell-btn.status-medical:hover,
+.cell-btn.status-holiday:hover,
+.cell-btn.status-recess:hover,
+.cell-btn.status-union:hover {
+  border-color: var(--cell-border, transparent);
+  background: var(--cell-bg, #fff);
+  color: var(--cell-text, #002147);
+}
+
 .expired-cell,
 .expired-cell strong,
 .expired-cell span {
