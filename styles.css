@@ -1149,13 +1149,14 @@ select {
 .expired-cell,
 .expired-cell strong,
 .expired-cell span {
-  color: #4c5563;
+  color: var(--expired-cell-text, #4c5563);
 }
 
 .status-medical.expired-cell,
 .status-medical.expired-cell strong,
 .status-medical.expired-cell span {
-  color: var(--status-medical-text);
+  --expired-cell-text: var(--status-medical-text);
+  color: var(--expired-cell-text);
 }
 
 .status-onsite {
@@ -1214,14 +1215,27 @@ select {
 }
 
 .expired-cell {
-  color: #4c5563;
-  background-image: repeating-linear-gradient(
+  --expired-cell-overlay: repeating-linear-gradient(
     135deg,
     rgba(129, 143, 159, 0.16),
     rgba(129, 143, 159, 0.16) 6px,
     rgba(255, 255, 255, 0.18) 6px,
     rgba(255, 255, 255, 0.18) 12px
   );
+  color: var(--expired-cell-text, #4c5563);
+  background-image: var(--expired-cell-overlay);
+  cursor: default;
+  transition: none;
+}
+
+.cell-btn.expired-cell:hover,
+.cell-btn.expired-cell:focus,
+.cell-btn.expired-cell:focus-visible {
+  border-color: var(--cell-border, transparent);
+  background: var(--cell-bg, #fff);
+  background-image: var(--expired-cell-overlay);
+  color: var(--expired-cell-text, #4c5563);
+  outline: none;
 }
 
 .locked-mark {
