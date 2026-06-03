@@ -593,7 +593,7 @@ select {
 .rules-summary {
   grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr);
   gap: 12px;
-  align-items: start;
+  align-items: stretch;
   padding: 12px var(--side-space);
 }
 
@@ -606,7 +606,7 @@ select {
 
 .rules-summary-action {
   display: grid;
-  align-content: start;
+  align-content: center;
   min-width: 0;
 }
 
