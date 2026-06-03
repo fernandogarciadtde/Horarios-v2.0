@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Exportacion semana</title>
-    <link rel="stylesheet" href="styles.css?v=pdf-real-page-20260602" />
+    <link rel="stylesheet" href="styles.css?v=pdf-proportions-20260602" />
     <style>
       html,
       body {
@@ -59,12 +59,46 @@
       .schedule-table th,
       .schedule-table td {
         padding: 6px !important;
-        font-size: 11px !important;
+        font-size: 12px !important;
       }
 
       .schedule-table th:first-child,
       .schedule-table td:first-child {
-        width: 22% !important;
+        width: 28% !important;
+      }
+
+      .schedule-table th {
+        font-size: 13px !important;
+      }
+
+      .agent-identity {
+        gap: 8px !important;
+      }
+
+      .agent-identity span:last-child {
+        font-size: 13px !important;
+        white-space: normal !important;
+        line-height: 1.2 !important;
+      }
+
+      .agent-avatar {
+        width: 44px !important;
+        height: 44px !important;
+        border-radius: 10px !important;
+        font-size: 14px !important;
+        flex: 0 0 44px !important;
+      }
+
+      .cell-btn {
+        min-height: 52px !important;
+      }
+
+      .cell-btn strong {
+        font-size: 14px !important;
+      }
+
+      .cell-btn span {
+        font-size: 11px !important;
       }
 
       @page {
@@ -75,6 +109,6 @@
   </head>
   <body>
     <main id="pdfExportRoot"></main>
-    <script src="exportar-pdf.js?v=pdf-real-page-20260602"></script>
+    <script src="exportar-pdf.js?v=pdf-proportions-20260602"></script>
   </body>
 </html>
