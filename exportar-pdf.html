@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Exportacion semana</title>
+    <link rel="stylesheet" href="styles.css?v=pdf-real-page-20260602" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #fff;
+      }
+
+      body {
+        padding: 8mm;
+      }
+
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      .week-export-sheet {
+        position: static !important;
+        left: auto !important;
+        top: auto !important;
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+
+      .export-pdf-header,
+      .week-block {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+
+      .export-hidden,
+      .week-toggle,
+      .week-issues-column {
+        display: none !important;
+      }
+
+      .week-main.with-issues {
+        grid-template-columns: minmax(0, 1fr) !important;
+      }
+
+      .week-table-wrap {
+        overflow: visible !important;
+        width: 100% !important;
+      }
+
+      .schedule-table {
+        width: 100% !important;
+        min-width: 0 !important;
+      }
+
+      .schedule-table th,
+      .schedule-table td {
+        padding: 6px !important;
+        font-size: 11px !important;
+      }
+
+      .schedule-table th:first-child,
+      .schedule-table td:first-child {
+        width: 22% !important;
+      }
+
+      @page {
+        size: landscape;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="pdfExportRoot"></main>
+    <script src="exportar-pdf.js?v=pdf-real-page-20260602"></script>
+  </body>
+</html>

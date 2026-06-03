@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Version local Python del planificador Service Desk UCEN.",
   "scripts": {
-    "check": "node --check app.js && node --check login.js && node --check reglas-vigentes.js"
+    "check": "node --check app.js && node --check login.js && node --check reglas-vigentes.js && node --check exportar-pdf.js"
   },
   "engines": {
     "node": ">=20"

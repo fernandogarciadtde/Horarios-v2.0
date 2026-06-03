@@ -1982,45 +1982,26 @@ function exportExcel() {
 function exportWeekPdf(weekBlock, weekKey) {
   const exportNode = buildWeekExportNode(weekBlock);
   const exportTitle = exportWeekPdfTitle(weekKey);
-  const printWindow = window.open("", "_blank");
+  const token = `pdf-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  try {
+    localStorage.setItem(
+      `ucen_pdf_export_${token}`,
+      JSON.stringify({
+        title: exportTitle,
+        html: exportNode.innerHTML,
+      }),
+    );
+  } catch {
+    showRulesError("No se pudo preparar la exportacion PDF. Intenta nuevamente.");
+    return;
+  }
+  const printWindow = window.open(`exportar-pdf.html?token=${encodeURIComponent(token)}`, "_blank");
   if (!printWindow) {
+    localStorage.removeItem(`ucen_pdf_export_${token}`);
     showRulesError("El navegador bloqueó la ventana de PDF. Permite ventanas emergentes para exportar.");
     return;
   }
-  printWindow.document.write(`
-    <!doctype html>
-    <html lang="es">
-      <head>
-        <meta charset="utf-8" />
-        <title>${escapeHtml(exportTitle)}</title>
-        <style>${collectPageStyles(true)}</style>
-        <style>
-          html, body { margin: 0; background: #fff; }
-          body { padding: 8mm; }
-          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          .export-pdf-header, .week-block {
-            width: 100% !important;
-            max-width: 100% !important;
-            box-sizing: border-box !important;
-          }
-          .export-hidden, .week-toggle, .week-issues-column { display: none !important; }
-          .week-main.with-issues { grid-template-columns: minmax(0, 1fr) !important; }
-          .week-table-wrap { overflow: visible !important; width: 100% !important; }
-          .schedule-table { width: 100% !important; min-width: 0 !important; }
-          .schedule-table th, .schedule-table td { padding: 6px !important; font-size: 11px !important; }
-          .schedule-table th:first-child, .schedule-table td:first-child { width: 22% !important; }
-          @page { size: landscape; margin: 0; }
-        </style>
-      </head>
-      <body>${exportNode.innerHTML}</body>
-    </html>
-  `);
-  printWindow.document.close();
-  printWindow.document.title = exportTitle;
   printWindow.focus();
-  setTimeout(() => {
-    printWindow.print();
-  }, 250);
 }
 
 function exportWeekPdfTitle(weekKey) {
@@ -2052,19 +2033,6 @@ function buildExportHeaderNode() {
     </div>
   `;
   return header;
-}
-
-function collectPageStyles(asText = false) {
-  const css = [...document.styleSheets]
-    .map((sheet) => {
-      try {
-        return [...sheet.cssRules].map((rule) => rule.cssText).join("\n");
-      } catch {
-        return "";
-      }
-    })
-    .join("\n");
-  return asText ? css : `<style>${css}</style>`;
 }
 
 function downloadUrl(url, filename) {
