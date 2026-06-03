@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "local_data"
 STATE_FILE = DATA_DIR / "state.json"
 USERS_FILE = DATA_DIR / "users.json"
+INITIAL_CREDENTIALS_FILE = DATA_DIR / "credenciales_iniciales.txt"
 COOKIE_NAME = "ucen_sd_session"
 PORT = int(os.environ.get("PORT", "4174"))
 PBKDF2_ROUNDS = 120_000
@@ -43,7 +44,7 @@ def write_json(path: Path, data) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def make_user(user_id: str, name: str, email: str, role: str, password: str) -> dict:
+def make_user(user_id: str, name: str, email: str, role: str, password: str, must_change_password: bool = True) -> dict:
     user = {
         "id": user_id,
         "name": name,
@@ -52,9 +53,9 @@ def make_user(user_id: str, name: str, email: str, role: str, password: str) -> 
         "photo": "",
         "salt": "",
         "passwordHash": "",
-        "mustChangePassword": False,
+        "mustChangePassword": must_change_password,
     }
-    set_password(user, password, False)
+    set_password(user, password, must_change_password)
     return user
 
 
@@ -91,14 +92,49 @@ def public_user(user: dict | None) -> dict | None:
 
 
 def create_default_users() -> list[dict]:
-    return [
-        make_user("admin-cristopher", "Cristopher Calabr\u00e1n", "cristopher.calabran@ucentral.cl", "admin", "Cambiar.2026!"),
-        make_user("tutor-monserrat", "Monserrat Vargas", "monserrat.vargas@ucentral.cl", "tutor", "Tutor.2026!"),
-        make_user("tutor-viviana", "Viviana Brice\u00f1o", "viviana.briceno@ucentral.cl", "tutor", "Tutor.2026!"),
-        make_user("tutor-fernando", "Fernando Garc\u00eda", "fernando.garcia@ucentral.cl", "tutor", "Tutor.2026!"),
-        make_user("tutor-denisse-bravo", "Denisse Bravo", "denisse.bravo@ucentral.cl", "tutor", "Tutor.2026!"),
-        make_user("tutor-denisse-rossel", "Denisse Rossel", "denisse.rossel@ucentral.cl", "tutor", "Tutor.2026!"),
+    specs = [
+        ("admin-cristopher", "Cristopher Calabr\u00e1n", "cristopher.calabran@ucentral.cl", "admin"),
+        ("tutor-monserrat", "Monserrat Vargas", "monserrat.vargas@ucentral.cl", "tutor"),
+        ("tutor-viviana", "Viviana Brice\u00f1o", "viviana.briceno@ucentral.cl", "tutor"),
+        ("tutor-fernando", "Fernando Garc\u00eda", "fernando.garcia@ucentral.cl", "tutor"),
+        ("tutor-denisse-bravo", "Denisse Bravo", "denisse.bravo@ucentral.cl", "tutor"),
+        ("tutor-denisse-rossel", "Denisse Rossel", "denisse.rossel@ucentral.cl", "tutor"),
     ]
+    credentials = []
+    users = []
+    for user_id, name, email, role in specs:
+        password = initial_password_for(user_id, role)
+        users.append(make_user(user_id, name, email, role, password))
+        credentials.append({"name": name, "email": email, "password": password})
+    write_initial_credentials(credentials)
+    return users
+
+
+def initial_password_for(user_id: str, role: str) -> str:
+    specific_key = f"INITIAL_PASSWORD_{user_id.upper().replace('-', '_')}"
+    role_key = "INITIAL_ADMIN_PASSWORD" if role == "admin" else "INITIAL_TUTOR_PASSWORD"
+    return os.environ.get(specific_key) or os.environ.get(role_key) or secrets.token_urlsafe(12)
+
+
+def write_initial_credentials(credentials: list[dict]) -> None:
+    if INITIAL_CREDENTIALS_FILE.exists():
+        return
+    lines = [
+        "Credenciales iniciales generadas automaticamente.",
+        "Este archivo esta dentro de local_data y no debe subirse a GitHub.",
+        "Cada usuario debe cambiar su contrasena al primer ingreso.",
+        "",
+    ]
+    for credential in credentials:
+        lines.extend(
+            [
+                credential["name"],
+                credential["email"],
+                credential["password"],
+                "",
+            ]
+        )
+    INITIAL_CREDENTIALS_FILE.write_text("\n".join(lines), encoding="utf-8")
 
 
 def create_default_state() -> dict:
@@ -337,8 +373,11 @@ def main() -> None:
     ensure_data()
     server = ThreadingHTTPServer(("127.0.0.1", PORT), AppHandler)
     print(f"App local Python disponible en http://127.0.0.1:{PORT}")
-    print("Admin: cristopher.calabran@ucentral.cl / Cambiar.2026!")
-    print("Tutor: fernando.garcia@ucentral.cl / Tutor.2026!")
+    print("Por seguridad, las contrasenas no se muestran en consola.")
+    if INITIAL_CREDENTIALS_FILE.exists():
+        print(f"Credenciales iniciales locales: {INITIAL_CREDENTIALS_FILE.relative_to(ROOT)}")
+    else:
+        print("Usa las credenciales configuradas o resetea la clave desde el panel de administracion.")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

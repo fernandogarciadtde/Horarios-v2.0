@@ -39,12 +39,19 @@ http://127.0.0.1:4174
 ```text
 Administrador:
 cristopher.calabran@ucentral.cl
-Cambiar.2026!
 
 Tutor ejemplo:
 fernando.garcia@ucentral.cl
-Tutor.2026!
 ```
+
+Las contrasenas temporales no se muestran en consola ni se suben a GitHub.
+En una instalacion nueva quedan guardadas localmente en:
+
+```text
+local_data/credenciales_iniciales.txt
+```
+
+Despues del primer ingreso, cada usuario debe cambiar su contrasena.
 
 ## Datos locales
 

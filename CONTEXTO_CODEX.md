@@ -99,15 +99,16 @@ Administrador:
 
 ```text
 cristopher.calabran@ucentral.cl
-Cambiar.2026!
 ```
 
 Tutor ejemplo:
 
 ```text
 fernando.garcia@ucentral.cl
-Tutor.2026!
 ```
+
+Las contrasenas temporales no se muestran en consola ni se suben a GitHub.
+En una instalacion nueva quedan guardadas localmente en `local_data/credenciales_iniciales.txt`.
 
 ## Flujo entre casa y oficina
 
