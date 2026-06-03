@@ -1991,13 +1991,13 @@ function exportWeekPdf(weekBlock, weekKey) {
     <html lang="es">
       <head>
         <meta charset="utf-8" />
-        <title> </title>
+        <title>Horario ${formatDate(weekKey)}</title>
         <style>${collectPageStyles(true)}</style>
         <style>
           html, body { margin: 0; background: #fff; }
           body { padding: 8mm; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          .week-block {
+          .export-pdf-header, .week-block {
             width: 100% !important;
             max-width: 100% !important;
             box-sizing: border-box !important;
@@ -2028,6 +2028,7 @@ function buildWeekExportNode(weekBlock) {
   clone.classList.remove("collapsed-week");
   clone.querySelectorAll(".export-hidden, .week-toggle").forEach((node) => node.remove());
   clone.querySelectorAll(".locked-mark").forEach((node) => node.remove());
+  wrapper.append(buildExportHeaderNode());
   wrapper.append(clone);
   return wrapper;
 }
