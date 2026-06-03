@@ -697,9 +697,18 @@ select {
 
 .manual-hero {
   display: grid;
-  gap: 10px;
+  grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr);
+  gap: 22px;
+  align-items: center;
   padding: 22px;
   border-left: 5px solid var(--ucen-bright-blue);
+}
+
+.manual-hero-copy {
+  display: grid;
+  gap: 10px;
+  align-content: center;
+  min-width: 0;
 }
 
 .manual-hero h2 {
@@ -717,10 +726,14 @@ select {
 }
 
 .manual-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 10px;
-  margin-top: 6px;
+  align-content: center;
+  min-width: 0;
+}
+
+.manual-actions .link-button {
+  width: 100%;
 }
 
 .manual-actions .ghost {
@@ -1301,6 +1314,10 @@ dialog::backdrop {
   }
 
   .manual-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .manual-hero {
     grid-template-columns: 1fr;
   }
 
