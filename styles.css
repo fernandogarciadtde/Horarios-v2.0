@@ -623,7 +623,8 @@ select {
 
 .rules-summary-action {
   display: grid;
-  align-content: center;
+  align-content: start;
+  align-items: start;
   min-width: 0;
 }
 
