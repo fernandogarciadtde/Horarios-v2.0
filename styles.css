@@ -372,7 +372,7 @@ a.ghost.link-button:hover {
 
 .calendar-control-row {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr);
+  grid-template-columns: minmax(600px, 3fr) minmax(320px, 2fr);
   gap: 14px;
   align-items: stretch;
   margin-bottom: 12px;
@@ -399,7 +399,7 @@ a.ghost.link-button:hover {
 
 .period-fields {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   align-items: stretch;
 }
@@ -410,7 +410,7 @@ a.ghost.link-button:hover {
 }
 
 #weekSelectLabel {
-  grid-column: 3;
+  grid-column: auto;
 }
 
 .period-panel .button-row {
@@ -623,8 +623,8 @@ select {
 
 .rules-summary-action {
   display: grid;
-  align-content: start;
-  align-items: start;
+  align-content: center;
+  align-items: center;
   min-width: 0;
 }
 
@@ -1305,6 +1305,12 @@ dialog::backdrop {
 
   .status-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1080px) {
+  .calendar-control-row {
+    grid-template-columns: 1fr;
   }
 }
 

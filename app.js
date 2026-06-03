@@ -1017,7 +1017,7 @@ function renderSelectors() {
     el.weekSelect.append(option);
   });
   el.weekSelect.value = selectedWeekKey;
-  el.weekSelectLabel.hidden = !isWeeklyView();
+  el.weekSelectLabel.hidden = false;
   [el.lockAgentInput, el.absenceAgentInput].forEach((select) => {
     select.innerHTML = "";
     state.agents.forEach((agent) => {
