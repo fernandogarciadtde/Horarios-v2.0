@@ -1257,8 +1257,8 @@ function renderWeekBlock(week, weekIndex, agents, weeklyIssues, weeklyNotificati
       <h3>Semana ${formatDate(weekKey)}</h3>
       <div class="week-actions">
         <span>${shiftSummaryText()}</span>
-        <button class="week-export-pdf export-hidden" type="button">PDF</button>
-        ${canCollapse ? `<button class="week-toggle" type="button">${collapsed ? "Expandir" : "Colapsar"}</button>` : ""}
+        <button class="week-export-pdf export-hidden" type="button">Exportar a PDF</button>
+        ${canCollapse ? `<button class="week-toggle" type="button">${collapsed ? "Expandir semana" : "Colapsar semana"}</button>` : ""}
       </div>
     </div>
   `;
@@ -1422,8 +1422,8 @@ function renderCalendarLegacy() {
         <h3>Semana ${formatDate(weekKey)}</h3>
         <div class="week-actions">
           <span>${shiftSummaryText()}</span>
-          <button class="week-export-pdf export-hidden" type="button">PDF</button>
-          ${canCollapse ? `<button class="week-toggle" type="button">${collapsed ? "Expandir" : "Colapsar"}</button>` : ""}
+          <button class="week-export-pdf export-hidden" type="button">Exportar a PDF</button>
+          ${canCollapse ? `<button class="week-toggle" type="button">${collapsed ? "Expandir semana" : "Colapsar semana"}</button>` : ""}
         </div>
       </div>
     `;
@@ -2463,7 +2463,7 @@ function formatDate(key) {
 }
 
 function shiftSummaryText() {
-  return "A: 8:30-18:30 / 17:30 | B: 10:30-20:30 / 17:30";
+  return "A: 8:30-18:30 / 17:30 (M-J-V) | B: 10:30-20:30 / 17:30 (M-J-V)";
 }
 
 function escapeHtml(value) {

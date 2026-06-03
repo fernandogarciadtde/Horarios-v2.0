@@ -45,7 +45,7 @@
   --status-union-border: #0072e5;
   --status-union-text: #002147;
   --ok: #0b7a4b;
-  --warn: #b54708;
+  --warn: var(--ucen-navy);
   --avatar-size: 72px;
   --side-space: 20px;
   font-family: "Segoe UI", Arial, sans-serif;
@@ -79,10 +79,16 @@ button {
   cursor: pointer;
   min-height: 38px;
   padding: 8px 12px;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
 }
 
 button:hover {
-  border-color: var(--ucen-red);
+  border-color: var(--ucen-light-blue);
+  background: #eef6ff;
+  color: var(--ucen-navy);
 }
 
 a.link-button,
@@ -95,18 +101,37 @@ a.link-button,
   border: 1px solid var(--line);
   border-radius: 6px;
   text-decoration: none;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
 }
 
 .primary {
-  background: var(--ucen-red);
-  border-color: var(--ucen-red);
+  background: var(--ucen-bright-blue);
+  border-color: var(--ucen-bright-blue);
   color: #fff;
   font-weight: 700;
 }
 
+.primary:hover,
+a.primary.link-button:hover {
+  border-color: var(--ucen-light-blue);
+  background: var(--ucen-blue);
+  color: #fff;
+}
+
 .ghost {
-  border-color: transparent;
-  color: var(--muted);
+  border-color: var(--line);
+  background: #fff;
+  color: var(--ucen-blue);
+}
+
+.ghost:hover,
+a.ghost.link-button:hover {
+  border-color: var(--ucen-light-blue);
+  background: #eef1f7;
+  color: var(--ucen-navy);
 }
 
 .wide {
@@ -247,6 +272,14 @@ a.link-button,
 .app-shell {
   display: block;
   padding: 18px var(--side-space);
+}
+
+.logout-button:hover,
+.week-toggle:hover,
+.week-export-pdf:hover {
+  border-color: var(--ucen-light-blue);
+  background: rgba(144, 171, 196, 0.28);
+  color: #fff;
 }
 
 .admin-shell {
@@ -627,6 +660,12 @@ select {
   display: grid;
   gap: 18px;
   padding: 18px var(--side-space);
+}
+
+.rules-manual-link:hover {
+  border-color: var(--ucen-light-blue);
+  background: var(--ucen-blue);
+  color: #fff;
 }
 
 .manual-hero {
