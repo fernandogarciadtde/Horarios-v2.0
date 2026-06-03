@@ -1981,6 +1981,7 @@ function exportExcel() {
 
 function exportWeekPdf(weekBlock, weekKey) {
   const exportNode = buildWeekExportNode(weekBlock);
+  const exportTitle = exportWeekPdfTitle(weekKey);
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
     showRulesError("El navegador bloqueó la ventana de PDF. Permite ventanas emergentes para exportar.");
@@ -1991,7 +1992,7 @@ function exportWeekPdf(weekBlock, weekKey) {
     <html lang="es">
       <head>
         <meta charset="utf-8" />
-        <title>Horario ${formatDate(weekKey)}</title>
+        <title>${escapeHtml(exportTitle)}</title>
         <style>${collectPageStyles(true)}</style>
         <style>
           html, body { margin: 0; background: #fff; }
@@ -2015,10 +2016,18 @@ function exportWeekPdf(weekBlock, weekKey) {
     </html>
   `);
   printWindow.document.close();
+  printWindow.document.title = exportTitle;
   printWindow.focus();
   setTimeout(() => {
     printWindow.print();
   }, 250);
+}
+
+function exportWeekPdfTitle(weekKey) {
+  const weeks = getMonthWeeks(state.year, state.month);
+  const weekNumber = Math.max(1, weeks.findIndex((week) => dateKey(week[0]) === weekKey) + 1);
+  const month = String(state.month + 1).padStart(2, "0");
+  return `Exportacion semana ${weekNumber}/${month}/${state.year}`;
 }
 
 function buildWeekExportNode(weekBlock) {
