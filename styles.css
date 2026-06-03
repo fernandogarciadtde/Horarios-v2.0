@@ -350,9 +350,14 @@ a.link-button,
 
 .period-fields {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
-  align-items: end;
+  align-items: stretch;
+}
+
+.period-fields label {
+  width: 100%;
+  margin-bottom: 0;
 }
 
 .period-panel .button-row {
