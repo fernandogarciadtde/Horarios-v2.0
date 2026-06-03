@@ -47,6 +47,7 @@
   --ok: #0b7a4b;
   --warn: #b54708;
   --avatar-size: 72px;
+  --side-space: 20px;
   font-family: "Segoe UI", Arial, sans-serif;
 }
 
@@ -245,13 +246,13 @@ a.link-button,
 
 .app-shell {
   display: block;
-  padding: 18px;
+  padding: 18px var(--side-space);
 }
 
 .admin-shell {
   display: grid;
   gap: 18px;
-  padding: 18px;
+  padding: 18px var(--side-space);
 }
 
 .admin-header {
@@ -316,7 +317,7 @@ a.link-button,
 }
 
 .panel {
-  padding: 14px;
+  padding: 14px var(--side-space);
 }
 
 .calendar-control-row {
@@ -545,14 +546,14 @@ select {
   display: grid;
   gap: 8px;
   margin-bottom: 12px;
-  padding: 14px;
+  padding: 14px var(--side-space);
 }
 
 .rules-summary {
   grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr);
   gap: 12px;
   align-items: stretch;
-  padding: 12px;
+  padding: 12px var(--side-space);
 }
 
 .rules-summary-copy {
@@ -621,7 +622,7 @@ select {
 .manual-shell {
   display: grid;
   gap: 18px;
-  padding: 18px;
+  padding: 18px var(--side-space);
 }
 
 .manual-hero {
@@ -807,7 +808,7 @@ select {
 .legend {
   flex-wrap: wrap;
   margin-bottom: 12px;
-  padding: 10px 12px;
+  padding: 10px var(--side-space);
   color: var(--muted);
   font-size: 13px;
 }
@@ -880,7 +881,7 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 11px 14px;
+  padding: 11px var(--side-space);
   color: #fff;
   background: var(--ucen-navy);
 }
@@ -977,7 +978,7 @@ select {
   align-content: start;
   gap: 6px;
   min-width: 0;
-  padding: 12px 14px;
+  padding: 12px var(--side-space);
   border-left: 1px solid var(--line);
   background: #fff7ed;
 }
@@ -1209,6 +1210,10 @@ dialog::backdrop {
 }
 
 @media (max-width: 720px) {
+  :root {
+    --side-space: 12px;
+  }
+
   .topbar {
     align-items: flex-start;
     flex-direction: column;
@@ -1234,10 +1239,6 @@ dialog::backdrop {
   .week-issues-column {
     border-top: 1px solid var(--line);
     border-left: 0;
-  }
-
-  .manual-shell {
-    padding: 12px;
   }
 
   .manual-hero h2 {
