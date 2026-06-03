@@ -1318,7 +1318,7 @@ function renderWeekBlock(week, weekIndex, agents, weeklyIssues, weeklyNotificati
   table.innerHTML = `
     <thead>
       <tr>
-        <th>Tutor</th>
+        <th>EQUIPO TUTORÍA</th>
         ${week.map((date) => `<th>${dayNames[isoDay(date) - 1]}<br>${formatDate(dateKey(date))}</th>`).join("")}
       </tr>
     </thead>
@@ -1479,7 +1479,7 @@ function renderCalendarLegacy() {
     table.innerHTML = `
       <thead>
         <tr>
-          <th>Tutor</th>
+          <th>EQUIPO TUTORÍA</th>
           ${week.map((date) => `<th>${dayNames[isoDay(date) - 1]}<br>${formatDate(dateKey(date))}</th>`).join("")}
         </tr>
       </thead>

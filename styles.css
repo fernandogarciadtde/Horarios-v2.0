@@ -892,7 +892,8 @@ select {
 
 .week-title h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: 18px;
+  font-weight: 800;
 }
 
 .week-title span {
@@ -1021,13 +1022,15 @@ select {
 .schedule-table th {
   background: #eef1f7;
   color: var(--ucen-blue);
-  font-size: 12px;
+  font-size: 15px;
+  font-weight: 800;
   text-transform: uppercase;
 }
 
 .schedule-table th:first-child,
 .schedule-table td:first-child {
   width: 264px;
+  padding-left: var(--side-space);
   text-align: left;
   font-weight: 700;
 }
