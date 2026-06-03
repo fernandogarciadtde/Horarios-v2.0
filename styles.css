@@ -357,7 +357,7 @@ a.ghost.link-button:hover {
   display: grid;
   grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr);
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
   margin-bottom: 12px;
 }
 
@@ -589,20 +589,20 @@ select {
 .rules-summary {
   grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr);
   gap: 12px;
-  align-items: stretch;
+  align-items: start;
   padding: 12px var(--side-space);
 }
 
 .rules-summary-copy {
   display: grid;
   gap: 5px;
-  align-content: center;
+  align-content: start;
   min-width: 0;
 }
 
 .rules-summary-action {
   display: grid;
-  align-content: center;
+  align-content: start;
   min-width: 0;
 }
 
