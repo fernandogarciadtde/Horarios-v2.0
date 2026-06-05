@@ -2467,7 +2467,10 @@ function exportWeekPdf(weekBlock, weekKey) {
     showRulesError("No se pudo preparar la exportacion PDF. Intenta nuevamente.");
     return;
   }
-  const printWindow = window.open(`exportar-pdf.html?token=${encodeURIComponent(token)}`, "_blank");
+  const printWindow = window.open(
+    `exportar-pdf.html?token=${encodeURIComponent(token)}&filename=${encodeURIComponent(exportFilename)}`,
+    "_blank",
+  );
   if (!printWindow) {
     localStorage.removeItem(`ucen_pdf_export_${token}`);
     showRulesError("El navegador bloqueó la ventana de PDF. Permite ventanas emergentes para exportar.");
