@@ -1916,14 +1916,66 @@ function randomizeSuggestedWeek(schedule, weekKey, week) {
 function rebalanceSuggestedWeek(schedule, weekKey, week, weekIndex, attempt = 0) {
   for (let pass = 0; pass < 3; pass += 1) {
     state.agents.forEach((agent) => assignSuggestedWeeklyB(schedule, weekKey, week, agent));
-    balanceDailyShiftDistribution(schedule, weekKey, week, weekIndex);
+    balanceSuggestedDailyShiftDistribution(schedule, weekKey, week, weekIndex);
     enforceSuggestedDailyOnsiteCoverage(schedule, weekKey, week, weekIndex);
     enforceSuggestedFridayB(schedule, weekKey, week, attempt + pass);
+    trimSuggestedWeeklyBOverflow(schedule, weekKey, week);
     state.agents.forEach((agent) => assignSuggestedWeeklyRemote(schedule, weekKey, week, agent, weekIndex));
-    rebalanceDailyRemoteShifts(schedule, weekKey, week);
+    rebalanceSuggestedDailyRemoteShifts(schedule, weekKey, week);
     ensureSuggestedMinimumDailyRemote(schedule, weekKey, week, weekIndex);
     enforceSuggestedDailyOnsiteCoverage(schedule, weekKey, week, weekIndex);
+    trimSuggestedWeeklyBOverflow(schedule, weekKey, week);
   }
+}
+
+function balanceSuggestedDailyShiftDistribution(schedule, weekKey, week, weekIndex) {
+  week.forEach((date) => {
+    const dayKey = dateKey(date);
+    const workCells = state.agents
+      .map((agent, agentIndex) => ({ agent, agentIndex, cell: schedule[weekKey]?.[agent.id]?.[dayKey] }))
+      .filter(({ cell }) => isEditableWorkCell(cell));
+    if (workCells.length < 4) return;
+
+    const targetB = Math.floor(workCells.length / 2);
+    let bCount = workCells.filter(({ cell }) => getShift(cell) === "B").length;
+
+    while (bCount < targetB) {
+      const candidate = workCells
+        .filter(({ agent, cell }) =>
+          isSuggestibleWorkCell(cell, dayKey) &&
+          getShift(cell) === "A" &&
+          weeklyShiftCount(schedule, weekKey, week, agent.id, "B") < weeklyBTarget(schedule, weekKey, week, agent.id),
+        )
+        .sort((a, b) => {
+          const aCount = weeklyShiftCount(schedule, weekKey, week, a.agent.id, "B");
+          const bCountForAgent = weeklyShiftCount(schedule, weekKey, week, b.agent.id, "B");
+          if (aCount !== bCountForAgent) return aCount - bCountForAgent;
+          return rotationScore(date, a.agentIndex, weekIndex, "B") - rotationScore(date, b.agentIndex, weekIndex, "B");
+        })[0];
+      if (!candidate) break;
+      setShift(candidate.cell, "B");
+      bCount += 1;
+    }
+
+    while (bCount > targetB) {
+      const candidate = workCells
+        .filter(({ agent, cell }) =>
+          isSuggestibleWorkCell(cell, dayKey) &&
+          getShift(cell) === "B" &&
+          weeklyShiftCount(schedule, weekKey, week, agent.id, "B") > weeklyBTarget(schedule, weekKey, week, agent.id) &&
+          canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agent.id, "A", getMode(cell), false),
+        )
+        .sort((a, b) => {
+          const aCount = weeklyShiftCount(schedule, weekKey, week, a.agent.id, "B");
+          const bCountForAgent = weeklyShiftCount(schedule, weekKey, week, b.agent.id, "B");
+          if (aCount !== bCountForAgent) return bCountForAgent - aCount;
+          return rotationScore(date, a.agentIndex, weekIndex, "A") - rotationScore(date, b.agentIndex, weekIndex, "A");
+        })[0];
+      if (!candidate) break;
+      setShift(candidate.cell, "A");
+      bCount -= 1;
+    }
+  });
 }
 
 function assignSuggestedWeeklyB(schedule, weekKey, week, agent) {
@@ -2006,6 +2058,26 @@ function assignSuggestedWeeklyRemote(schedule, weekKey, week, agent, weekIndex) 
   }
 }
 
+function rebalanceSuggestedDailyRemoteShifts(schedule, weekKey, week) {
+  week.forEach((date) => {
+    const dayKey = dateKey(date);
+    ["A", "B"].forEach((shift) => {
+      let remoteCells = state.agents
+        .map((agent) => ({ agent, cell: schedule[weekKey]?.[agent.id]?.[dayKey] }))
+        .filter(({ cell }) => isEditableWorkCell(cell) && getShift(cell) === shift && getMode(cell) === "remote");
+      const capacity = dailyRemoteShiftCapacity(schedule, weekKey, dayKey, shift);
+
+      for (const { agent, cell } of remoteCells) {
+        if (remoteCells.length <= capacity) break;
+        if (!isSuggestibleWorkCell(cell, dayKey)) continue;
+        if (!canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agent.id, shift, "onsite", false)) continue;
+        setMode(cell, "onsite");
+        remoteCells = remoteCells.filter((item) => item.agent.id !== agent.id);
+      }
+    });
+  });
+}
+
 function enforceSuggestedDailyOnsiteCoverage(schedule, weekKey, week, weekIndex) {
   week.forEach((date) => {
     const dayKey = dateKey(date);
@@ -2017,10 +2089,26 @@ function enforceSuggestedDailyOnsiteCoverage(schedule, weekKey, week, weekIndex)
       cell: schedule[weekKey]?.[agent.id]?.[dayKey],
     }));
     if (cells.every(({ cell }) => isClosedCell(cell))) return;
-    ensureOnsiteShift(schedule, cells, "B", weekIndex, date);
+    ensureSuggestedOnsiteShift(schedule, weekKey, dayKey, cells, "B", weekIndex, date);
     const bOnsiteAgent = cells.find(({ cell }) => getShift(cell) === "B" && getMode(cell) === "onsite")?.agent.id;
-    ensureOnsiteShift(schedule, cells, "A", weekIndex, date, bOnsiteAgent);
+    ensureSuggestedOnsiteShift(schedule, weekKey, dayKey, cells, "A", weekIndex, date, bOnsiteAgent);
   });
+}
+
+function ensureSuggestedOnsiteShift(schedule, weekKey, dayKey, cells, shift, weekIndex, date, excludedAgentId = null) {
+  const hasCoverage = cells.some(({ agent, cell }) => agent.id !== excludedAgentId && getShift(cell) === shift && getMode(cell) === "onsite");
+  if (hasCoverage) return;
+  const candidate = cells
+    .filter(({ agent, cell }) => agent.id !== excludedAgentId && isSuggestibleWorkCell(cell, dayKey))
+    .sort((a, b) => {
+      const aCount = monthlyOnsiteShiftCount(a.agent.id, shift, schedule);
+      const bCount = monthlyOnsiteShiftCount(b.agent.id, shift, schedule);
+      if (aCount !== bCount) return aCount - bCount;
+      return rotationScore(date, a.agentIndex, weekIndex, shift) - rotationScore(date, b.agentIndex, weekIndex, shift);
+    })[0];
+  if (!candidate) return;
+  candidate.cell.status = buildStatus(shift, "onsite");
+  candidate.cell.note = candidate.cell.note || "Ajuste por cobertura presencial";
 }
 
 function enforceSuggestedFridayB(schedule, weekKey, week, attempt = 0) {
@@ -2045,8 +2133,10 @@ function enforceSuggestedFridayB(schedule, weekKey, week, attempt = 0) {
   );
   const candidates = assignments.filter(({ cell }) => isSuggestibleWorkCell(cell, dayKey));
   if (!candidates.length) return;
-  const minCount = Math.min(...candidates.map(({ agent }) => counts.get(agent.id) || 0));
-  const fairCandidates = shuffle(candidates.filter(({ agent }) => (counts.get(agent.id) || 0) === minCount));
+  const viableCandidates = candidates.filter(({ agent }) => canAgentHoldSuggestedFridayB(schedule, weekKey, week, agent.id, dayKey));
+  const candidatePool = viableCandidates.length ? viableCandidates : candidates;
+  const minCount = Math.min(...candidatePool.map(({ agent }) => counts.get(agent.id) || 0));
+  const fairCandidates = shuffle(candidatePool.filter(({ agent }) => (counts.get(agent.id) || 0) === minCount));
   const target = fairCandidates[attempt % fairCandidates.length] || randomItem(candidates);
   if (!target) return;
 
@@ -2055,6 +2145,52 @@ function enforceSuggestedFridayB(schedule, weekKey, week, attempt = 0) {
     if (agent.id === target.agent.id) cell.status = "B-onsite";
     else if (isOnsiteShift(cell, "B")) cell.status = "A-onsite";
   });
+  trimSuggestedWeeklyBOverflow(schedule, weekKey, week, target.agent.id, dayKey);
+}
+
+function canAgentHoldSuggestedFridayB(schedule, weekKey, week, agentId, fridayKey) {
+  const target = weeklyBTarget(schedule, weekKey, week, agentId);
+  const currentCount = weeklyShiftCount(schedule, weekKey, week, agentId, "B");
+  const fridayCell = schedule[weekKey]?.[agentId]?.[fridayKey];
+  const nextCount = currentCount + (getShift(fridayCell) === "B" ? 0 : 1);
+  if (nextCount <= target) return true;
+  return suggestedBOverflowCandidates(schedule, weekKey, week, agentId, fridayKey).length > 0;
+}
+
+function trimSuggestedWeeklyBOverflow(schedule, weekKey, week, preferredAgentId = "", protectedDayKey = "") {
+  const agents = preferredAgentId
+    ? [...state.agents.filter((agent) => agent.id === preferredAgentId), ...state.agents.filter((agent) => agent.id !== preferredAgentId)]
+    : state.agents;
+
+  agents.forEach((agent) => {
+    let count = weeklyShiftCount(schedule, weekKey, week, agent.id, "B");
+    const target = weeklyBTarget(schedule, weekKey, week, agent.id);
+    let guard = 0;
+    while (count > target && guard < 10) {
+      guard += 1;
+      const candidate = suggestedBOverflowCandidates(schedule, weekKey, week, agent.id, protectedDayKey)[0];
+      if (!candidate) break;
+      setShift(candidate.cell, "A");
+      count -= 1;
+    }
+  });
+}
+
+function suggestedBOverflowCandidates(schedule, weekKey, week, agentId, protectedDayKey = "") {
+  return week
+    .map((date) => ({ date, dayKey: dateKey(date), cell: schedule[weekKey]?.[agentId]?.[dateKey(date)] }))
+    .filter(({ dayKey, cell }) =>
+      dayKey !== protectedDayKey &&
+      isSuggestibleWorkCell(cell, dayKey) &&
+      getShift(cell) === "B" &&
+      canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agentId, "A", getMode(cell), false),
+    )
+    .sort((a, b) => {
+      const aIsFriday = isoDay(a.date) === 5 ? 1 : 0;
+      const bIsFriday = isoDay(b.date) === 5 ? 1 : 0;
+      if (aIsFriday !== bIsFriday) return aIsFriday - bIsFriday;
+      return Math.random() - 0.5;
+    });
 }
 
 function ensureSuggestedMinimumDailyRemote(schedule, weekKey, week, weekIndex) {
