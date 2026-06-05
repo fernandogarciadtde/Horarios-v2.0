@@ -9,7 +9,7 @@ if (!payloadText) {
 } else {
   const payload = JSON.parse(payloadText);
   localStorage.removeItem(storageKey);
-  document.title = payload.title || "Exportacion semana";
+  document.title = payload.filename || payload.title || "semana";
   root.innerHTML = payload.html || "";
   window.addEventListener("afterprint", () => {
     setTimeout(() => window.close(), 250);

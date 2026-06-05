@@ -2452,13 +2452,14 @@ function exportExcel() {
 
 function exportWeekPdf(weekBlock, weekKey) {
   const exportNode = buildWeekExportNode(weekBlock);
-  const exportTitle = exportWeekPdfTitle(weekKey);
+  const exportFilename = exportWeekPdfFilename(weekKey);
   const token = `pdf-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   try {
     localStorage.setItem(
       `ucen_pdf_export_${token}`,
       JSON.stringify({
-        title: exportTitle,
+        title: exportFilename,
+        filename: exportFilename,
         html: exportNode.innerHTML,
       }),
     );
@@ -2475,11 +2476,11 @@ function exportWeekPdf(weekBlock, weekKey) {
   printWindow.focus();
 }
 
-function exportWeekPdfTitle(weekKey) {
+function exportWeekPdfFilename(weekKey) {
   const weeks = getMonthWeeks(state.year, state.month);
   const weekNumber = Math.max(1, weeks.findIndex((week) => dateKey(week[0]) === weekKey) + 1);
   const month = String(state.month + 1).padStart(2, "0");
-  return `Exportacion semana ${weekNumber}/${month}/${state.year}`;
+  return `semana-${weekNumber}-${month}-${state.year}`;
 }
 
 function buildWeekExportNode(weekBlock) {
