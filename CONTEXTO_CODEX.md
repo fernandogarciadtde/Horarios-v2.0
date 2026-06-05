@@ -2,7 +2,7 @@
 
 ## Proyecto
 
-Planificador Service Desk UCEN.
+Planificador Turnos Tutoría UCEN.
 
 Repositorio:
 
@@ -14,15 +14,11 @@ https://github.com/fernandogarciadtde/Horarios-v2.0
 
 La version oficial actual es la version Python local.
 
-Netlify fue descartado y eliminado del proyecto. No retomar el camino de Netlify salvo que Fernando lo pida explicitamente.
-
-La rama principal publicada es `main`. El ultimo estado importante subido incluye:
+La rama principal publicada es `main`. El estado actual incluye:
 
 - Version Python local como camino principal.
-- Eliminacion de Netlify y sus funciones.
-- Archivo `requirements.txt` agregado como referencia.
+- Exportacion semanal solo en PDF.
 - Este archivo `CONTEXTO_CODEX.md` para sincronizar contexto entre casa y oficina.
-- Commit de oficina `8684398`: actualizacion de interfaz y reglas vigentes.
 
 Regla de trabajo: cuando se tome una decision relevante del proyecto, actualizar este archivo antes de cerrar la sesion o publicar cambios.
 
@@ -136,7 +132,7 @@ git push origin main
 
 No agregar `local_data` al commit.
 
-El archivo `.gitignore` excluye `local_data`, logs, zips y los archivos locales del informe para evitar publicaciones accidentales.
+El archivo `.gitignore` excluye `local_data`, logs y zips para evitar publicaciones accidentales.
 
 Si se trabaja desde una nueva conversacion de Codex, pedir:
 
@@ -160,7 +156,7 @@ Validar JavaScript:
 npm.cmd run check
 ```
 
-El chequeo JS actual valida `app.js`, `login.js` y `reglas-vigentes.js`.
+El chequeo JS actual valida `app.js`, `login.js`, `reglas-vigentes.js` y `exportar-pdf.js`.
 
 La app debe responder en:
 
@@ -199,11 +195,3 @@ La URL de uso siempre es local al equipo que ejecuta el servidor:
 http://127.0.0.1:4174
 ```
 
-## Archivos locales no publicados
-
-Estos archivos quedaron fuera del repositorio porque no son necesarios para ejecutar la app y deben revisarse antes de publicarlos:
-
-```text
-Informe_Tecnico_Planificador_Service_Desk.docx
-generar_informe_tecnico.py
-```

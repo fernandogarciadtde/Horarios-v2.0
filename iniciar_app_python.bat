@@ -4,7 +4,7 @@ cd /d "%~dp0"
 
 echo.
 echo ==============================================
-echo  Planificador Service Desk UCEN
+echo  Planificador Turnos Tutoria UCEN
 echo ==============================================
 echo.
 

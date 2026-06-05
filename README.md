@@ -1,6 +1,6 @@
-# Planificador Service Desk UCEN - Version Python local
+# Planificador Turnos Tutoría UCEN - Version Python local
 
-Aplicacion local para planificar turnos del equipo Service Desk de la Universidad Central de Chile.
+Aplicacion local para planificar turnos del Equipo de Tutoría y Acompañamiento de la Universidad Central de Chile.
 
 Esta es la version oficial del proyecto. Se ejecuta con Python en el computador donde se va a trabajar y guarda los datos en archivos locales dentro de `local_data`.
 

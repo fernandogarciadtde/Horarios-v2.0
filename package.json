@@ -1,7 +1,7 @@
 {
-  "name": "planificador-service-desk-ucentral-python",
+  "name": "planificador-turnos-tutoria-ucen-python",
   "version": "1.0.0",
-  "description": "Version local Python del planificador Service Desk UCEN.",
+  "description": "Version local Python del planificador de turnos tutoria UCEN.",
   "scripts": {
     "check": "node --check app.js && node --check login.js && node --check reglas-vigentes.js && node --check exportar-pdf.js"
   },

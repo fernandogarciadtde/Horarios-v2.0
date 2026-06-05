@@ -79,7 +79,6 @@ const el = {
   calendarViewMode: document.querySelector("#calendarViewMode"),
   weekSelect: document.querySelector("#weekSelect"),
   weekSelectLabel: document.querySelector("#weekSelectLabel"),
-  generateBtn: document.querySelector("#generateBtn"),
   resetBtn: document.querySelector("#resetBtn"),
   addAgentBtn: document.querySelector("#addAgentBtn"),
   agentsList: document.querySelector("#agentsList"),
@@ -266,7 +265,6 @@ function bindEvents() {
     selectedWeekKey = el.weekSelect.value;
     render();
   });
-  el.generateBtn?.addEventListener("click", generateSchedule);
   el.resetBtn.addEventListener("click", async () => {
     if (!canEdit()) return;
     if (!confirm("¿Restaurar agentes y configuración inicial?")) return;
@@ -612,10 +610,6 @@ function monthlyFridayBCounts(assignments) {
   return counts;
 }
 
-function monthlyFridayBCount(agentId, schedule) {
-  return monthlyFridayBCounts(monthlyFridayAssignments(schedule)).get(agentId) || 0;
-}
-
 function balanceAllDailyShiftDistribution(schedule) {
   getMonthWeeks(state.year, state.month).forEach((week, weekIndex) => {
     balanceDailyShiftDistribution(schedule, dateKey(week[0]), week, weekIndex);
@@ -864,10 +858,6 @@ function setShift(cell, shift) {
 function setMode(cell, mode) {
   if (!isEditableWorkCell(cell)) return;
   cell.status = buildStatus(getShift(cell), mode, isUnionStatus(cell));
-}
-
-function isShift(cell, shift) {
-  return getShift(cell) === shift;
 }
 
 function isWorkShift(cell, shift) {
@@ -1444,125 +1434,6 @@ function isVisibleWeekKey(weekKey) {
   return visibleWeeks().some((week) => dateKey(week[0]) === weekKey);
 }
 
-function renderCalendarLegacy() {
-  el.calendarView.innerHTML = "";
-  const agents = visibleAgents();
-  const weeklyIssues = renderWeeklyIssues || weeklyRuleIssues();
-  const weeklyNotifications = renderWeeklyNotifications || weeklyRuleNotifications();
-  if (!agents.length) {
-    el.calendarView.innerHTML = `<article class="week-block empty-view"><p>No hay turnos personales asociados a este usuario.</p></article>`;
-    return;
-  }
-  visibleWeeks().forEach((week, weekIndex) => {
-    const weekKey = dateKey(week[0]);
-    const block = document.createElement("article");
-    block.className = "week-block";
-    const canCollapse = isMonthlyView();
-    const collapsed = canCollapse && collapsedWeeks.has(weekKey);
-    if (collapsed) block.classList.add("collapsed-week");
-    block.innerHTML = `
-      <div class="week-title">
-        <h3>Semana ${formatDate(weekKey)}</h3>
-        <div class="week-actions">
-          <span>${shiftSummaryText()}</span>
-          <button class="week-export-pdf export-hidden" type="button">Exportar a PDF</button>
-          ${canCollapse ? `<button class="week-toggle" type="button">${collapsed ? "Expandir semana" : "Colapsar semana"}</button>` : ""}
-        </div>
-      </div>
-    `;
-    block.querySelector(".week-export-pdf")?.addEventListener("click", () => exportWeekPdf(block, weekKey));
-    const toggle = block.querySelector(".week-toggle");
-    toggle?.addEventListener("click", () => {
-      if (collapsedWeeks.has(weekKey)) collapsedWeeks.delete(weekKey);
-      else collapsedWeeks.add(weekKey);
-      renderCalendar();
-    });
-    const body = document.createElement("div");
-    body.className = "week-body";
-    const weekMain = document.createElement("div");
-    weekMain.className = "week-main";
-    if (canEdit()) weekMain.classList.add("with-issues");
-    const tableWrap = document.createElement("div");
-    tableWrap.className = "week-table-wrap";
-    const issueColumn = document.createElement("aside");
-    issueColumn.className = "week-issues-column";
-    const issues = weeklyIssues.get(weekKey) || [];
-    const notifications = weeklyNotifications.get(weekKey) || [];
-    issueColumn.innerHTML = canEdit()
-      ? `
-        <p class="rule-message"><strong>Incongruencias de la semana:</strong></p>
-        ${
-          issues.length
-            ? issues.map((issue) => `<p class="rule-message">• ${escapeHtml(issue)}</p>`).join("")
-            : '<p class="rule-message">Sin incongruencias.</p>'
-        }
-        ${
-          showWeeklyNotifications && notifications.length
-            ? `
-              <div class="week-notifications">
-                <p class="rule-message"><strong>Notificaciones:</strong></p>
-                ${notifications.map((notification) => `<p class="rule-message">• ${escapeHtml(notification)}</p>`).join("")}
-              </div>
-            `
-            : ""
-        }
-        <button class="week-notification-toggle" type="button">${showWeeklyNotifications ? "Ocultar notificaciones" : "Mostrar notificaciones"}</button>
-      <button class="week-undo" type="button"${undoHistory.length ? "" : " disabled"}>Deshacer &uacute;ltimo cambio</button>
-      `
-      : "";
-    issueColumn.querySelector(".week-notification-toggle")?.addEventListener("click", () => {
-      showWeeklyNotifications = !showWeeklyNotifications;
-      renderCalendar();
-    });
-    issueColumn.querySelector(".week-undo")?.addEventListener("click", undoLastChange);
-    const table = document.createElement("table");
-    table.className = "schedule-table";
-    table.innerHTML = `
-      <thead>
-        <tr>
-          <th>EQUIPO TUTORÍA</th>
-          ${week.map((date) => `<th>${dayNames[isoDay(date) - 1]}<br>${formatDate(dateKey(date))}</th>`).join("")}
-        </tr>
-      </thead>
-      <tbody></tbody>
-    `;
-    const tbody = table.querySelector("tbody");
-    agents.forEach((agent) => {
-      const row = document.createElement("tr");
-      row.innerHTML = `<td>${agentIdentityHtml(agent)}</td>`;
-      week.forEach((date) => {
-        const key = dateKey(date);
-        const cell = state.schedule[weekKey]?.[agent.id]?.[key] || { status: "A-onsite" };
-        const option = options[cell.status] || options["A-onsite"];
-        const td = document.createElement("td");
-        const button = document.createElement("button");
-        const expired = isExpiredDay(key);
-        const displayLabel = cell.note === "Asistencia obligatoria" ? "Asistencia obligatoria" : option.label;
-        const showLabel = cell.status !== "holiday";
-        const showLockedMark = shouldShowLockedMark(cell, expired);
-        const monthlyFridayClass = isMonthlyFridayBCell(cell, key) ? " status-monthly-friday-b" : "";
-        button.className = `cell-btn ${option.className}${monthlyFridayClass}${cell.note === "Asistencia obligatoria" ? " status-mandatory" : ""}${expired ? " expired-cell" : ""}`;
-        button.disabled = expired || !canEdit();
-        button.innerHTML = `
-          <strong>${displayCellCode(cell, option, key)}${showLockedMark ? '<span class="locked-mark">Bloq.</span>' : ""}</strong>
-          ${showLabel ? `<span>${displayLabel}</span>` : ""}
-        `;
-        button.addEventListener("click", () => openCellEditor(weekKey, agent.id, key));
-        td.append(button);
-        row.append(td);
-      });
-      tbody.append(row);
-    });
-    tableWrap.append(table);
-    weekMain.append(tableWrap);
-    if (canEdit()) weekMain.append(issueColumn);
-    body.append(weekMain);
-    body.append(buildLegendNode("week-legend"));
-    block.append(body);
-    el.calendarView.append(block);
-  });
-}
-
 function buildLegendNode(extraClass = "") {
   const legend = document.createElement("section");
   legend.className = `legend${extraClass ? ` ${extraClass}` : ""}`;
@@ -1804,10 +1675,6 @@ function weeklyRuleNotifications() {
     if (notifications.length) byWeek.set(weekKey, notifications);
   });
   return byWeek;
-}
-
-function permanentMedicalAgents() {
-  return state.agents.filter((agent) => hasPermanentMedicalAbsence(agent.id));
 }
 
 function hasPermanentMedicalAbsence(agentId) {
@@ -2341,19 +2208,6 @@ function displayCellCode(cell, option, dayKey = "") {
   return `${option.code}${isMonthlyFridayBCell(cell, dayKey) ? " (M)" : ""}`;
 }
 
-function applyManualLockToFutureWeeks(agentId, dayKey, override) {
-  const targetIsoDay = isoDay(new Date(`${dayKey}T00:00:00`));
-  getMonthWeeks(state.year, state.month).forEach((week) => {
-    week.forEach((date) => {
-      const key = dateKey(date);
-      if (key < dayKey || isoDay(date) !== targetIsoDay || isExpiredDay(key)) return;
-      const weekKey = dateKey(week[0]);
-      if (!state.schedule[weekKey]?.[agentId]?.[key]) return;
-      state.manualOverrides[`${weekKey}|${agentId}|${key}`] = { ...override };
-    });
-  });
-}
-
 function syncUnionOptions(agentName) {
   const allowed = canUseUnion(agentName);
   [...el.cellStatusInput.options].forEach((option) => {
@@ -2440,46 +2294,6 @@ function undoLastChange() {
   restoreScrollAnchor(scrollAnchor);
 }
 
-function resetWeek(weekKey, week) {
-  if (!canEdit()) return;
-  const scrollAnchor = captureScrollAnchor(weekKey);
-  pushUndoSnapshot();
-  week.forEach((date) => {
-    const dayKey = dateKey(date);
-    state.agents.forEach((agent) => {
-      const cell = state.schedule[weekKey]?.[agent.id]?.[dayKey];
-      if (!cell || isProtectedResetCell(cell, dayKey)) return;
-      const overrideKey = `${weekKey}|${agent.id}|${dayKey}`;
-      delete state.manualOverrides[overrideKey];
-    });
-  });
-  generateSchedule(weekKey);
-  restoreScrollAnchor(scrollAnchor);
-}
-
-function isProtectedResetCell(cell, dayKey = "") {
-  return (
-    isExpiredDay(dayKey) ||
-    cell.status === "medical" ||
-    isClosedCell(cell) ||
-    cell.note === "Asistencia obligatoria" ||
-    cell.note === "Bloqueo recurrente" ||
-    cell.note === "Bloqueo manual" ||
-    cell.expired
-  );
-}
-
-function exportExcel() {
-  const workbook = buildXlsxWorkbook();
-  const blob = new Blob([workbook], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `Horario_Service_Desk_${exportScopeName()}_${String(state.month + 1).padStart(2, "0")}-${state.year}.xlsx`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 function exportWeekPdf(weekBlock, weekKey) {
   const exportNode = buildWeekExportNode(weekBlock);
   const exportFilename = exportWeekPdfFilename(weekKey);
@@ -2538,387 +2352,6 @@ function buildExportHeaderNode() {
     </div>
   `;
   return header;
-}
-
-function downloadUrl(url, filename) {
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-}
-
-function buildXlsxWorkbook() {
-  const files = {
-    "[Content_Types].xml": contentTypesXml(),
-    "_rels/.rels": rootRelsXml(),
-    "xl/workbook.xml": workbookXml(),
-    "xl/_rels/workbook.xml.rels": workbookRelsXml(),
-    "xl/styles.xml": workbookStylesXml(),
-    "xl/worksheets/sheet1.xml": scheduleWorksheetXml(),
-  };
-  return createZip(files);
-}
-
-function exportScopeName() {
-  const names = {
-    month: "Mes_completo",
-    week: `Semana_${formatDate(selectedWeekKey || defaultSelectedWeekKey()).replaceAll("/", "-")}`,
-    "my-week": `Mis_turnos_semana_${formatDate(selectedWeekKey || defaultSelectedWeekKey()).replaceAll("/", "-")}`,
-    "my-month": "Mis_turnos_mes",
-  };
-  return names[calendarViewMode] || "Mes_completo";
-}
-
-function scheduleWorksheetXml() {
-  const weeks = visibleWeeks();
-  const agents = visibleAgents();
-  const rows = [];
-  const merges = [];
-  const colCount = 8;
-
-  rows.push(xlsxRow(1, [
-    blankCell("A1"),
-    blankCell("B1"),
-    xlsxCell("C1", "Turno", "header"),
-    xlsxCell("D1", "Lunes y Martes", "header"),
-    xlsxCell("E1", "Miércoles a Viernes", "header"),
-  ]));
-  rows.push(xlsxRow(2, [
-    blankCell("A2"),
-    blankCell("B2"),
-    xlsxCell("C2", "A", "shiftA"),
-    xlsxCell("D2", "8:30 a 18:30 hrs.", "bold"),
-    xlsxCell("E2", "8:30 a 17:30 hrs.", "bold"),
-    xlsxCell("F2", "Presencial", "onsite"),
-    xlsxCell("G2", "Administrativo", "admin"),
-    xlsxCell("H2", "Feriado", "holiday"),
-  ]));
-  rows.push(xlsxRow(3, [
-    blankCell("A3"),
-    blankCell("B3"),
-    xlsxCell("C3", "B", "shiftB"),
-    xlsxCell("D3", "10:30 a 20:30 hrs.", "bold"),
-    xlsxCell("E3", "10:30 a 17:30 hrs.", "bold"),
-    xlsxCell("F3", "Remoto", "remote"),
-    xlsxCell("G3", "Licencia médica", "medical"),
-    xlsxCell("H3", "Receso", "recess"),
-  ]));
-  rows.push(xlsxRow(4, [
-    blankCell("A4"),
-    blankCell("B4"),
-    xlsxCell("C4", "Teletrabajo", "remote"),
-    blankCell("D4", "remote"),
-    blankCell("E4", "remote"),
-    blankCell("F4"),
-    xlsxCell("G4", "Sindicato", "union"),
-    xlsxCell("H4", "Obligatorio", "mandatory"),
-  ]));
-  merges.push("C4:E4");
-  rows.push(xlsxRow(5, Array.from({ length: colCount }, (_, index) => blankCell(`${columnName(index + 1)}5`, "blank"))));
-
-  let rowIndex = 6;
-
-  weeks.forEach((week) => {
-    const weekKey = dateKey(week[0]);
-    rows.push(xlsxRow(rowIndex, [
-      xlsxCell(`A${rowIndex}`, "", "header"),
-      xlsxCell(`B${rowIndex}`, "Tutor", "header"),
-      ...week.map((date, index) => xlsxCell(`${columnName(index + 3)}${rowIndex}`, dayNames[isoDay(date) - 1].toUpperCase(), "header")),
-      xlsxCell(`H${rowIndex}`, "SABADO", "header"),
-    ]));
-    rowIndex += 1;
-    const firstAgentRow = rowIndex;
-    agents.forEach((agent) => {
-      rows.push(xlsxRow(rowIndex, [
-        xlsxCell(`A${rowIndex}`, rowIndex === firstAgentRow ? `Semana\n${formatDate(weekKey)}` : "", "week"),
-        xlsxCell(`B${rowIndex}`, agent.name, "agent"),
-        ...week.map((date, index) => scheduleXlsxCell(`${columnName(index + 3)}${rowIndex}`, weekKey, agent.id, dateKey(date))),
-        xlsxCell(`H${rowIndex}`, "", "holiday"),
-      ]));
-      rowIndex += 1;
-    });
-    if (agents.length > 1) merges.push(`A${firstAgentRow}:A${rowIndex - 1}`);
-    rows.push(xlsxRow(rowIndex, Array.from({ length: colCount }, (_, index) => blankCell(`${columnName(index + 1)}${rowIndex}`, "blank"))));
-    rowIndex += 1;
-  });
-
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-  <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-    <sheetViews><sheetView workbookViewId="0"/></sheetViews>
-    <sheetFormatPr defaultRowHeight="18"/>
-    <cols>
-      <col min="1" max="8" width="16" customWidth="1"/>
-    </cols>
-    <sheetData>${rows.join("")}</sheetData>
-    <mergeCells count="${merges.length}">${merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("")}</mergeCells>
-  </worksheet>
-  `;
-}
-
-function scheduleXlsxCell(ref, weekKey, agentId, dayKey) {
-  const cell = state.schedule[weekKey]?.[agentId]?.[dayKey] || { status: "A-onsite" };
-  const option = options[cell.status] || options["A-onsite"];
-  const style = isMonthlyFridayBCell(cell, dayKey)
-    ? "monthlyFridayB"
-    : isUnionStatus(cell)
-    ? "union"
-    : getMode(cell) === "remote"
-      ? "remote"
-      : cell.status === "admin"
-      ? "admin"
-      : ["admin_morning", "admin_afternoon"].includes(cell.status)
-        ? "admin-partial"
-      : cell.status === "medical"
-        ? "medical"
-        : cell.status === "holiday"
-          ? "holiday"
-          : cell.status === "recess"
-            ? "recess"
-            : cell.note === "Asistencia obligatoria"
-            ? "mandatory"
-            : "";
-  return xlsxCell(ref, exportCode(cell, option, dayKey), style || "onsite");
-}
-
-function contentTypesXml() {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-  <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-    <Default Extension="xml" ContentType="application/xml"/>
-    <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-    <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
-    <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
-  </Types>`;
-}
-
-function rootRelsXml() {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-  <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
-  </Relationships>`;
-}
-
-function workbookXml() {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-  <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-    <sheets><sheet name="Horario" sheetId="1" r:id="rId1"/></sheets>
-  </workbook>`;
-}
-
-function workbookRelsXml() {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-  <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
-    <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-  </Relationships>`;
-}
-
-function workbookStylesXml() {
-  const fills = ["FFFFFF", "EEF1F7", "CFE5FF", "6F93B3", "EAD7AA", "004680", "818F9F", "002147", "0072E5", "F4F6FA", "E8D2F0"];
-  const fillXml = [
-    '<fill><patternFill patternType="none"/></fill>',
-    '<fill><patternFill patternType="gray125"/></fill>',
-    ...fills.map((color) => `<fill><patternFill patternType="solid"><fgColor rgb="FF${color}"/><bgColor indexed="64"/></patternFill></fill>`),
-  ].join("");
-  const styles = [
-    { fill: 2, border: 1 },
-    { fill: 3, border: 1, font: 1 },
-    { fill: 4, border: 1, font: 1 },
-    { fill: 5, border: 1, font: 1 },
-    { fill: 2, border: 1, font: 1 },
-    { fill: 5, border: 1, font: 1 },
-    { fill: 6, border: 1, font: 1 },
-    { fill: 7, border: 1, font: 2 },
-    { fill: 6, border: 1, font: 1 },
-    { fill: 8, border: 1, font: 1 },
-    { fill: 9, border: 1, font: 2 },
-    { fill: 10, border: 1, font: 2 },
-    { fill: 3, border: 1, font: 1, wrap: true },
-    { fill: 2, border: 1, font: 1 },
-    { fill: 2, border: 0 },
-    { fill: 2, border: 1 },
-    { fill: 11, border: 1, font: 1 },
-    { fill: 12, border: 1, font: 1 },
-  ];
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-  <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-    <fonts count="3">
-      <font><sz val="12"/><name val="Calibri"/></font>
-      <font><b/><sz val="12"/><name val="Calibri"/></font>
-      <font><b/><sz val="12"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
-    </fonts>
-    <fills count="${fills.length + 2}">${fillXml}</fills>
-    <borders count="2">
-      <border><left/><right/><top/><bottom/><diagonal/></border>
-      <border><left style="thin"><color rgb="FF000000"/></left><right style="thin"><color rgb="FF000000"/></right><top style="thin"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border>
-    </borders>
-    <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-    <cellXfs count="${styles.length}">
-      ${styles.map((style) => `<xf numFmtId="0" fontId="${style.font || 0}" fillId="${style.fill}" borderId="${style.border}" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"${style.wrap ? ' wrapText="1"' : ""}/></xf>`).join("")}
-    </cellXfs>
-    <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
-    <dxfs count="0"/>
-    <tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/>
-  </styleSheet>`;
-}
-
-function xlsxRow(rowIndex, cells) {
-  return `<row r="${rowIndex}">${cells.join("")}</row>`;
-}
-
-function blankCell(ref, style = "blank") {
-  return `<c r="${ref}" s="${xlsxStyleIndex(style)}"/>`;
-}
-
-function xlsxCell(ref, value, style = "onsite") {
-  return `<c r="${ref}" t="inlineStr" s="${xlsxStyleIndex(style)}"><is><t xml:space="preserve">${xmlEscape(value)}</t></is></c>`;
-}
-
-function xlsxStyleIndex(style) {
-  const styles = {
-    default: 0,
-    header: 1,
-    shiftA: 2,
-    shiftB: 3,
-    bold: 4,
-    remote: 5,
-    admin: 6,
-    "admin-partial": 6,
-    medical: 7,
-    union: 8,
-    holiday: 9,
-    recess: 10,
-    mandatory: 11,
-    week: 12,
-    agent: 13,
-    blank: 14,
-    onsite: 15,
-    expired: 16,
-    monthlyFridayB: 17,
-  };
-  return styles[style] ?? styles.default;
-}
-
-function columnName(index) {
-  let name = "";
-  while (index > 0) {
-    index -= 1;
-    name = String.fromCharCode(65 + (index % 26)) + name;
-    index = Math.floor(index / 26);
-  }
-  return name;
-}
-
-function xmlEscape(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-function createZip(files) {
-  const encoder = new TextEncoder();
-  const chunks = [];
-  const central = [];
-  let offset = 0;
-  Object.entries(files).forEach(([name, content]) => {
-    const nameBytes = encoder.encode(name);
-    const data = encoder.encode(content);
-    const crc = crc32(data);
-    const local = new Uint8Array(30 + nameBytes.length);
-    const localView = new DataView(local.buffer);
-    localView.setUint32(0, 0x04034b50, true);
-    localView.setUint16(4, 20, true);
-    localView.setUint16(6, 0, true);
-    localView.setUint16(8, 0, true);
-    localView.setUint16(10, 0, true);
-    localView.setUint16(12, 0, true);
-    localView.setUint32(14, crc, true);
-    localView.setUint32(18, data.length, true);
-    localView.setUint32(22, data.length, true);
-    localView.setUint16(26, nameBytes.length, true);
-    localView.setUint16(28, 0, true);
-    local.set(nameBytes, 30);
-    chunks.push(local, data);
-
-    const centralEntry = new Uint8Array(46 + nameBytes.length);
-    const centralView = new DataView(centralEntry.buffer);
-    centralView.setUint32(0, 0x02014b50, true);
-    centralView.setUint16(4, 20, true);
-    centralView.setUint16(6, 20, true);
-    centralView.setUint16(8, 0, true);
-    centralView.setUint16(10, 0, true);
-    centralView.setUint16(12, 0, true);
-    centralView.setUint16(14, 0, true);
-    centralView.setUint32(16, crc, true);
-    centralView.setUint32(20, data.length, true);
-    centralView.setUint32(24, data.length, true);
-    centralView.setUint16(28, nameBytes.length, true);
-    centralView.setUint16(30, 0, true);
-    centralView.setUint16(32, 0, true);
-    centralView.setUint16(34, 0, true);
-    centralView.setUint16(36, 0, true);
-    centralView.setUint32(38, 0, true);
-    centralView.setUint32(42, offset, true);
-    centralEntry.set(nameBytes, 46);
-    central.push(centralEntry);
-    offset += local.length + data.length;
-  });
-
-  const centralOffset = offset;
-  const centralSize = central.reduce((sum, entry) => sum + entry.length, 0);
-  const end = new Uint8Array(22);
-  const endView = new DataView(end.buffer);
-  endView.setUint32(0, 0x06054b50, true);
-  endView.setUint16(8, central.length, true);
-  endView.setUint16(10, central.length, true);
-  endView.setUint32(12, centralSize, true);
-  endView.setUint32(16, centralOffset, true);
-  return concatBytes([...chunks, ...central, end]);
-}
-
-function concatBytes(parts) {
-  const output = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
-  let offset = 0;
-  parts.forEach((part) => {
-    output.set(part, offset);
-    offset += part.length;
-  });
-  return output;
-}
-
-function crc32(bytes) {
-  const table = crc32.table || (crc32.table = buildCrc32Table());
-  let crc = 0xffffffff;
-  for (let i = 0; i < bytes.length; i += 1) {
-    crc = (crc >>> 8) ^ table[(crc ^ bytes[i]) & 0xff];
-  }
-  return (crc ^ 0xffffffff) >>> 0;
-}
-
-function buildCrc32Table() {
-  const table = new Uint32Array(256);
-  for (let i = 0; i < 256; i += 1) {
-    let crc = i;
-    for (let j = 0; j < 8; j += 1) {
-      crc = crc & 1 ? 0xedb88320 ^ (crc >>> 1) : crc >>> 1;
-    }
-    table[i] = crc >>> 0;
-  }
-  return table;
-}
-
-function exportCode(cell, option, dayKey = "") {
-  const monthlyMarker = isMonthlyFridayBCell(cell, dayKey) ? " (M)" : "";
-  if (cell.status === "holiday") return "FERIADO";
-  if (cell.status === "recess") return "RECESO";
-  if (cell.status === "admin") return "ADMINISTRATIVO";
-  if (cell.status === "admin_morning") return "ADM A";
-  if (cell.status === "admin_afternoon") return "ADM B";
-  if (cell.status === "medical") return "LM";
-  if (isUnionStatus(cell)) return `${getShift(cell)} SIND${monthlyMarker}`;
-  return `${option.code.replace("-R", "")}${monthlyMarker}`;
 }
 
 function getMonthWeeks(year, month) {
