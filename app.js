@@ -157,7 +157,7 @@ async function init() {
   if (!state) return;
   el.monthSelect.value = state.month;
   el.yearInput.value = state.year;
-  if (!Object.keys(state.schedule).length && canEdit()) generateSchedule();
+  if (!Object.keys(state.schedule).length && canEdit()) generateSchedule({ preserveScroll: false });
   if (canEdit()) await loadUsers();
   render();
 }
@@ -249,13 +249,13 @@ function bindEvents() {
     if (!canEdit()) return;
     pushUndoSnapshot();
     state.month = Number(el.monthSelect.value);
-    generateSchedule();
+    generateSchedule({ preserveExistingWeeks: true });
   });
   el.yearInput.addEventListener("change", () => {
     if (!canEdit()) return;
     pushUndoSnapshot();
     state.year = Number(el.yearInput.value);
-    generateSchedule();
+    generateSchedule({ preserveExistingWeeks: true });
   });
   el.calendarViewMode.addEventListener("change", () => {
     calendarViewMode = el.calendarViewMode.value;
@@ -272,7 +272,7 @@ function bindEvents() {
     const response = await fetch("/api/reset-state", { method: "POST" });
     const payload = await response.json();
     state = payload.state;
-    generateSchedule();
+    generateSchedule({ preserveScroll: false });
   });
   el.addAgentBtn.addEventListener("click", () => {
     if (!canEdit()) return;
@@ -356,16 +356,28 @@ async function saveAdminResetPassword(event) {
   renderAgents();
 }
 
-function generateSchedule(onlyWeekKey = null) {
+function generateSchedule(input = {}) {
   if (!canEdit()) return;
-  if (typeof onlyWeekKey !== "string") onlyWeekKey = null;
+  const { onlyWeekKey, preserveExistingWeeks, preserveScroll } = scheduleOptions(input);
+  const scrollAnchor = preserveScroll ? captureScrollAnchor(onlyWeekKey || "") : null;
   const previousSchedule = state.schedule || {};
   const weeks = getMonthWeeks(state.year, state.month);
-  const schedule = {};
+  const schedule = structuredClone(previousSchedule);
+  const protectedWeekKeys = new Set(
+    preserveExistingWeeks && !onlyWeekKey
+      ? weeks.map((week) => dateKey(week[0])).filter((weekKey) => previousSchedule[weekKey])
+      : [],
+  );
   const fridayB = new Map(state.agents.map((agent) => [agent.id, 0]));
 
   weeks.forEach((week, weekIndex) => {
     const weekKey = dateKey(week[0]);
+    if (onlyWeekKey && weekKey !== onlyWeekKey) return;
+    if (protectedWeekKeys.has(weekKey)) {
+      schedule[weekKey] = protectedWeekForCalculation(previousSchedule[weekKey]);
+      countProtectedFridayB(schedule, weekKey, week, fridayB);
+      return;
+    }
     schedule[weekKey] = {};
     state.agents.forEach((agent) => {
       schedule[weekKey][agent.id] = {};
@@ -404,17 +416,44 @@ function generateSchedule(onlyWeekKey = null) {
   rebalanceWeeklyTargets(schedule);
   ensureMinimumDailyRemote(schedule);
 
-  if (onlyWeekKey) {
-    Object.entries(previousSchedule).forEach(([weekKey, weekByAgent]) => {
-      if (weekKey !== onlyWeekKey) schedule[weekKey] = weekByAgent;
-    });
-  }
-
   lockExpiredDays(schedule, previousSchedule);
+  protectedWeekKeys.forEach((weekKey) => {
+    schedule[weekKey] = previousSchedule[weekKey];
+  });
 
   state.schedule = schedule;
   saveState();
   renderScheduleUpdate(onlyWeekKey);
+  restoreScrollAnchor(scrollAnchor);
+}
+
+function scheduleOptions(input) {
+  if (typeof input === "string") return { onlyWeekKey: input, preserveExistingWeeks: false, preserveScroll: true };
+  return {
+    onlyWeekKey: typeof input?.onlyWeekKey === "string" ? input.onlyWeekKey : null,
+    preserveExistingWeeks: Boolean(input?.preserveExistingWeeks),
+    preserveScroll: input?.preserveScroll !== false,
+  };
+}
+
+function protectedWeekForCalculation(weekByAgent = {}) {
+  const protectedWeek = structuredClone(weekByAgent);
+  Object.values(protectedWeek).forEach((days) => {
+    Object.values(days || {}).forEach((cell) => {
+      cell.locked = true;
+    });
+  });
+  return protectedWeek;
+}
+
+function countProtectedFridayB(schedule, weekKey, week, fridayB) {
+  const friday = week.find((date) => isoDay(date) === 5 && date.getMonth() === state.month);
+  if (!friday) return;
+  const dayKey = dateKey(friday);
+  state.agents.forEach((agent) => {
+    const cell = schedule[weekKey]?.[agent.id]?.[dayKey];
+    if (isOnsiteShift(cell, "B")) fridayB.set(agent.id, (fridayB.get(agent.id) || 0) + 1);
+  });
 }
 
 function assignMonthlyFridayB(schedule, weekKey, friday, fridayB, weekIndex) {
@@ -2201,7 +2240,7 @@ function shouldShowLockedMark(cell, expired = false) {
 function isMonthlyFridayBCell(cell, dayKey = "") {
   if (!isOnsiteShift(cell, "B")) return false;
   const date = new Date(`${dayKey}T00:00:00`);
-  return !Number.isNaN(date.getTime()) && isoDay(date) === 5 && date.getMonth() === state.month;
+  return !Number.isNaN(date.getTime()) && isoDay(date) === 5;
 }
 
 function displayCellCode(cell, option, dayKey = "") {

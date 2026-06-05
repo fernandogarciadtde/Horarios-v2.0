@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Reglas vigentes | Planificador Turnos Tutor&iacute;a</title>
-    <link rel="stylesheet" href="styles.css?v=session-panel-groups-20260602" />
+    <link rel="stylesheet" href="styles.css?v=overlap-weeks-20260605" />
   </head>
   <body>
     <header class="topbar">
@@ -147,6 +147,7 @@
               <span class="status-item admin"><i class="swatch admin"></i> ADM B tarde</span>
               <span class="status-item medical"><i class="swatch medical"></i> Licencia m&eacute;dica</span>
               <span class="status-item union"><i class="swatch union"></i> Salida sindicato</span>
+              <span class="status-item monthly"><i class="swatch monthly"></i> Viernes B mensual (M)</span>
               <span class="status-item holiday"><i class="swatch holiday"></i> Feriado</span>
               <span class="status-item recess"><i class="swatch recess"></i> Receso institucional</span>
             </div>
@@ -154,6 +155,10 @@
               Los estados administrativo y licencia m&eacute;dica se consideran ausencia para efectos de dotaci&oacute;n.
               Feriado y receso cierran el d&iacute;a para el c&aacute;lculo. Asistencia obligatoria fuerza presencialidad
               y no exige remoto en ese d&iacute;a.
+            </p>
+            <p>
+              El estado visual <strong>B (M)</strong> identifica el viernes B presencial que participa en la rotaci&oacute;n
+              mensual. Se destaca para que Cristopher prefiera modificar otros bloques antes de alterar esa asignaci&oacute;n.
             </p>
           </section>
 
@@ -170,6 +175,11 @@
               <li>Bloquea d&iacute;as vencidos para que no sean movidos por un rec&aacute;lculo posterior.</li>
               <li>Valida reglas y muestra incongruencias sin impedir la edici&oacute;n manual.</li>
             </ol>
+            <div class="manual-callout">
+              Las semanas que se traslapan entre dos meses se guardan con una sola clave semanal, determinada por el
+              lunes de esa semana. Por ejemplo, la semana del lunes 29/06/2026 al viernes 03/07/2026 se muestra igual
+              en junio y julio: cualquier cambio hecho desde un mes queda reflejado en el otro.
+            </div>
           </section>
 
           <section id="reglas" class="manual-section panel">

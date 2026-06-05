@@ -238,6 +238,11 @@ a.ghost.link-button:hover {
 .back-top-button:hover {
   border-color: var(--ucen-light-blue);
   background: var(--ucen-blue);
+  color: #fff;
+}
+
+.back-top-button:focus-visible {
+  color: #fff;
 }
 
 .manual-session {
@@ -415,6 +420,17 @@ a.ghost.link-button:hover {
 .period-fields select,
 .period-fields input {
   min-width: 0;
+}
+
+.period-protocol {
+  margin: 0;
+  padding: 9px 10px;
+  border-left: 4px solid var(--ucen-bright-blue);
+  border-radius: 6px;
+  background: rgba(144, 171, 196, 0.14);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 #weekSelectLabel {

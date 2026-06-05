@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Planificador Turnos Tutoría | DTDE</title>
-    <link rel="stylesheet" href="styles.css?v=monthly-friday-marker-20260605" />
+    <link rel="stylesheet" href="styles.css?v=overlap-weeks-20260605" />
   </head>
   <body>
     <header class="topbar">
@@ -58,6 +58,10 @@
                 <select id="weekSelect"></select>
               </label>
             </div>
+            <p class="period-protocol">
+              Las semanas que cruzan dos meses se guardan una sola vez por su lunes. Si una semana aparece en ambos meses,
+              ver&aacute;s exactamente la misma asignaci&oacute;n para evitar duplicidad y desincronizaci&oacute;n.
+            </p>
           </section>
           <section id="rulesPanel" class="rules-panel" data-admin-only></section>
         </section>
@@ -230,6 +234,6 @@
       </form>
     </dialog>
 
-    <script src="app.js?v=monthly-friday-marker-20260605"></script>
+    <script src="app.js?v=overlap-weeks-20260605"></script>
   </body>
 </html>
