@@ -1002,6 +1002,46 @@ function renderScheduleUpdate(onlyWeekKey = null) {
   renderWeeklyNotifications = null;
 }
 
+function captureScrollAnchor(preferredWeekKey = "") {
+  const blocks = [...el.calendarView.querySelectorAll(".week-block[data-week-key]")];
+  const preferredBlock = preferredWeekKey
+    ? blocks.find((block) => block.dataset.weekKey === preferredWeekKey)
+    : null;
+  const visibleBlock = preferredBlock || blocks.find((block) => {
+    const rect = block.getBoundingClientRect();
+    return rect.bottom > 0 && rect.top < window.innerHeight;
+  });
+  const block = visibleBlock || blocks[0];
+  if (!block) return { scrollY: window.scrollY, weekKey: preferredWeekKey, top: null };
+  return {
+    scrollY: window.scrollY,
+    weekKey: block.dataset.weekKey || preferredWeekKey,
+    top: block.getBoundingClientRect().top,
+  };
+}
+
+function restoreScrollAnchor(anchor, attempts = 12) {
+  if (!anchor) return;
+  let remaining = attempts;
+  const restore = () => {
+    const block = anchor.weekKey
+      ? el.calendarView.querySelector(`.week-block[data-week-key="${anchor.weekKey}"]`)
+      : null;
+    if (block && anchor.top !== null) {
+      const delta = block.getBoundingClientRect().top - anchor.top;
+      window.scrollTo(0, Math.max(0, window.scrollY + delta));
+      return;
+    }
+    if (remaining > 0) {
+      remaining -= 1;
+      requestAnimationFrame(restore);
+      return;
+    }
+    window.scrollTo(0, anchor.scrollY);
+  };
+  requestAnimationFrame(restore);
+}
+
 function renderSelectors() {
   const lockValue = el.lockAgentInput.value;
   const absenceValue = el.absenceAgentInput.value;
@@ -1807,6 +1847,7 @@ function validateRules() {
 function suggestWeekSchedule(weekKey, week) {
   if (!canEdit()) return;
   if (!state.schedule?.[weekKey]) return;
+  const scrollAnchor = captureScrollAnchor(weekKey);
   const baseSchedule = structuredClone(state.schedule);
   const mutableCells = suggestibleWeekAssignments(baseSchedule, weekKey, week);
   if (!mutableCells.length) {
@@ -1842,6 +1883,7 @@ function suggestWeekSchedule(weekKey, week) {
   state.schedule[weekKey] = selected.weekByAgent;
   saveState();
   renderScheduleUpdate(weekKey);
+  restoreScrollAnchor(scrollAnchor);
 }
 
 function suggestibleWeekAssignments(schedule, weekKey, week) {
@@ -2229,13 +2271,16 @@ function pushUndoSnapshot() {
 
 function undoLastChange() {
   if (!canEdit() || !undoHistory.length) return;
+  const scrollAnchor = captureScrollAnchor();
   state = undoHistory.pop();
   saveState();
   render();
+  restoreScrollAnchor(scrollAnchor);
 }
 
 function resetWeek(weekKey, week) {
   if (!canEdit()) return;
+  const scrollAnchor = captureScrollAnchor(weekKey);
   pushUndoSnapshot();
   week.forEach((date) => {
     const dayKey = dateKey(date);
@@ -2247,6 +2292,7 @@ function resetWeek(weekKey, week) {
     });
   });
   generateSchedule(weekKey);
+  restoreScrollAnchor(scrollAnchor);
 }
 
 function isProtectedResetCell(cell, dayKey = "") {
