@@ -1347,7 +1347,6 @@ function renderWeekBlock(week, weekIndex, agents, weeklyIssues, weeklyNotificati
       <button class="week-notification-toggle" type="button">${showWeeklyNotifications ? "Ocultar notificaciones" : "Mostrar notificaciones"}</button>
       <button class="week-suggest" type="button">Sugerir turnos</button>
       <button class="week-undo" type="button"${undoHistory.length ? "" : " disabled"}>Deshacer &uacute;ltimo cambio</button>
-      <button class="week-reset" type="button">Resetear semana</button>
     `
     : "";
   issueColumn.querySelector(".week-notification-toggle")?.addEventListener("click", () => {
@@ -1356,7 +1355,6 @@ function renderWeekBlock(week, weekIndex, agents, weeklyIssues, weeklyNotificati
   });
   issueColumn.querySelector(".week-suggest")?.addEventListener("click", () => suggestWeekSchedule(weekKey, week));
   issueColumn.querySelector(".week-undo")?.addEventListener("click", undoLastChange);
-  issueColumn.querySelector(".week-reset")?.addEventListener("click", () => resetWeek(weekKey, week));
   const table = document.createElement("table");
   table.className = "schedule-table";
   table.innerHTML = `
@@ -1509,7 +1507,6 @@ function renderCalendarLegacy() {
         }
         <button class="week-notification-toggle" type="button">${showWeeklyNotifications ? "Ocultar notificaciones" : "Mostrar notificaciones"}</button>
       <button class="week-undo" type="button"${undoHistory.length ? "" : " disabled"}>Deshacer &uacute;ltimo cambio</button>
-        <button class="week-reset" type="button">Resetear semana</button>
       `
       : "";
     issueColumn.querySelector(".week-notification-toggle")?.addEventListener("click", () => {
@@ -1517,7 +1514,6 @@ function renderCalendarLegacy() {
       renderCalendar();
     });
     issueColumn.querySelector(".week-undo")?.addEventListener("click", undoLastChange);
-    issueColumn.querySelector(".week-reset")?.addEventListener("click", () => resetWeek(weekKey, week));
     const table = document.createElement("table");
     table.className = "schedule-table";
     table.innerHTML = `

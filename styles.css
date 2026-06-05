@@ -1069,8 +1069,7 @@ select {
 
 .week-notification-toggle,
 .week-suggest,
-.week-undo,
-.week-reset {
+.week-undo {
   width: 100%;
   min-height: 34px;
   margin-top: 6px;
