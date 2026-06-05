@@ -32,6 +32,8 @@ const options = {
   recess: { shift: null, mode: "closed", label: "Receso institucional", code: "RECESO", className: "status-recess" },
 };
 
+const suggestibleStatuses = new Set(["A-onsite", "B-onsite", "A-remote", "B-remote"]);
+
 let state = null;
 let currentUser = null;
 let saveTimer = null;
@@ -1303,6 +1305,7 @@ function renderWeekBlock(week, weekIndex, agents, weeklyIssues, weeklyNotificati
           : ""
       }
       <button class="week-notification-toggle" type="button">${showWeeklyNotifications ? "Ocultar notificaciones" : "Mostrar notificaciones"}</button>
+      <button class="week-suggest" type="button">Sugerir turnos</button>
       <button class="week-undo" type="button"${undoHistory.length ? "" : " disabled"}>Deshacer &uacute;ltimo cambio</button>
       <button class="week-reset" type="button">Resetear semana</button>
     `
@@ -1311,6 +1314,7 @@ function renderWeekBlock(week, weekIndex, agents, weeklyIssues, weeklyNotificati
     showWeeklyNotifications = !showWeeklyNotifications;
     refreshVisibleWeekBlocks();
   });
+  issueColumn.querySelector(".week-suggest")?.addEventListener("click", () => suggestWeekSchedule(weekKey, week));
   issueColumn.querySelector(".week-undo")?.addEventListener("click", undoLastChange);
   issueColumn.querySelector(".week-reset")?.addEventListener("click", () => resetWeek(weekKey, week));
   const table = document.createElement("table");
@@ -1799,6 +1803,295 @@ function validateRules() {
   (renderWeeklyIssues || weeklyRuleIssues()).forEach((weekIssues) => issues.push(...weekIssues));
   return issues.slice(0, 20);
 }
+
+function suggestWeekSchedule(weekKey, week) {
+  if (!canEdit()) return;
+  if (!state.schedule?.[weekKey]) return;
+  const baseSchedule = structuredClone(state.schedule);
+  const mutableCells = suggestibleWeekAssignments(baseSchedule, weekKey, week);
+  if (!mutableCells.length) {
+    showRulesError("No hay bloques disponibles para sugerir en esta semana. Los dias bloqueados o especiales se mantienen sin cambios.");
+    return;
+  }
+
+  const weekIndex = getMonthWeeks(state.year, state.month).findIndex((item) => dateKey(item[0]) === weekKey);
+  const attempts = Math.max(80, mutableCells.length * 18);
+  let bestScore = Infinity;
+  let bestCandidates = [];
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const candidateSchedule = structuredClone(baseSchedule);
+    randomizeSuggestedWeek(candidateSchedule, weekKey, week);
+    rebalanceSuggestedWeek(candidateSchedule, weekKey, week, weekIndex, attempt);
+    const evaluation = scoreSuggestedWeek(candidateSchedule, weekKey, week);
+    if (evaluation.score < bestScore) {
+      bestScore = evaluation.score;
+      bestCandidates = [{ weekByAgent: structuredClone(candidateSchedule[weekKey]), evaluation }];
+    } else if (evaluation.score === bestScore) {
+      bestCandidates.push({ weekByAgent: structuredClone(candidateSchedule[weekKey]), evaluation });
+    }
+  }
+
+  if (!bestCandidates.length) {
+    showRulesError("No fue posible construir una sugerencia para esta semana con las reglas actuales.");
+    return;
+  }
+
+  const selected = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
+  pushUndoSnapshot();
+  state.schedule[weekKey] = selected.weekByAgent;
+  saveState();
+  renderScheduleUpdate(weekKey);
+}
+
+function suggestibleWeekAssignments(schedule, weekKey, week) {
+  const assignments = [];
+  state.agents.forEach((agent) => {
+    week.forEach((date) => {
+      const dayKey = dateKey(date);
+      const cell = schedule[weekKey]?.[agent.id]?.[dayKey];
+      if (isSuggestibleWorkCell(cell, dayKey)) assignments.push({ agent, dayKey, cell });
+    });
+  });
+  return assignments;
+}
+
+function isSuggestibleWorkCell(cell, dayKey = "") {
+  return Boolean(
+    cell &&
+      !isExpiredDay(dayKey) &&
+      !cell.locked &&
+      !cell.expired &&
+      suggestibleStatuses.has(cell.status),
+  );
+}
+
+function randomizeSuggestedWeek(schedule, weekKey, week) {
+  suggestibleWeekAssignments(schedule, weekKey, week).forEach(({ cell }) => {
+    const shift = Math.random() < 0.5 ? "A" : "B";
+    const mode = Math.random() < 0.34 ? "remote" : "onsite";
+    cell.status = buildStatus(shift, mode);
+    if (String(cell.note || "").startsWith("Ajuste por ")) cell.note = "";
+  });
+}
+
+function rebalanceSuggestedWeek(schedule, weekKey, week, weekIndex, attempt = 0) {
+  for (let pass = 0; pass < 3; pass += 1) {
+    state.agents.forEach((agent) => assignSuggestedWeeklyB(schedule, weekKey, week, agent));
+    balanceDailyShiftDistribution(schedule, weekKey, week, weekIndex);
+    enforceSuggestedDailyOnsiteCoverage(schedule, weekKey, week, weekIndex);
+    enforceSuggestedFridayB(schedule, weekKey, week, attempt + pass);
+    state.agents.forEach((agent) => assignSuggestedWeeklyRemote(schedule, weekKey, week, agent, weekIndex));
+    rebalanceDailyRemoteShifts(schedule, weekKey, week);
+    ensureSuggestedMinimumDailyRemote(schedule, weekKey, week, weekIndex);
+    enforceSuggestedDailyOnsiteCoverage(schedule, weekKey, week, weekIndex);
+  }
+}
+
+function assignSuggestedWeeklyB(schedule, weekKey, week, agent) {
+  const target = weeklyBTarget(schedule, weekKey, week, agent.id);
+  let count = weeklyShiftCount(schedule, weekKey, week, agent.id, "B");
+  let guard = 0;
+
+  while (count < target && guard < 10) {
+    guard += 1;
+    const candidate = randomItem(
+      week
+        .map((date) => ({ dayKey: dateKey(date), cell: schedule[weekKey]?.[agent.id]?.[dateKey(date)] }))
+        .filter(({ dayKey, cell }) =>
+          isSuggestibleWorkCell(cell, dayKey) &&
+          getShift(cell) === "A" &&
+          canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agent.id, "B", getMode(cell), false),
+        ),
+    );
+    if (!candidate) break;
+    setShift(candidate.cell, "B");
+    count += 1;
+  }
+
+  guard = 0;
+  while (count > target && guard < 10) {
+    guard += 1;
+    const candidate = randomItem(
+      week
+        .map((date) => ({ dayKey: dateKey(date), cell: schedule[weekKey]?.[agent.id]?.[dateKey(date)] }))
+        .filter(({ dayKey, cell }) =>
+          isSuggestibleWorkCell(cell, dayKey) &&
+          getShift(cell) === "B" &&
+          canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agent.id, "A", getMode(cell), false),
+        ),
+    );
+    if (!candidate) break;
+    setShift(candidate.cell, "A");
+    count -= 1;
+  }
+}
+
+function assignSuggestedWeeklyRemote(schedule, weekKey, week, agent, weekIndex) {
+  const target = weeklyRemoteTarget(schedule, weekKey, week, agent.id, weekIndex);
+  let count = weeklyRemoteCount(schedule, weekKey, week, agent.id);
+  let guard = 0;
+
+  while (count < target && guard < 10) {
+    guard += 1;
+    const candidate = randomItem(
+      week
+        .map((date) => ({ date, dayKey: dateKey(date), cell: schedule[weekKey]?.[agent.id]?.[dateKey(date)] }))
+        .filter(({ date, dayKey, cell }) =>
+          isSuggestibleWorkCell(cell, dayKey) &&
+          getMode(cell) === "onsite" &&
+          !(isoDay(date) === 5 && getShift(cell) === "B") &&
+          hasRemoteCapacityForDay(schedule, weekKey, dayKey, agent.id) &&
+          canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agent.id, getShift(cell), "remote", false),
+        ),
+    );
+    if (!candidate) break;
+    setMode(candidate.cell, "remote");
+    count += 1;
+  }
+
+  guard = 0;
+  while (count > target && guard < 10) {
+    guard += 1;
+    const candidate = randomItem(
+      week
+        .map((date) => ({ dayKey: dateKey(date), cell: schedule[weekKey]?.[agent.id]?.[dateKey(date)] }))
+        .filter(({ dayKey, cell }) =>
+          isSuggestibleWorkCell(cell, dayKey) &&
+          getMode(cell) === "remote" &&
+          canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agent.id, getShift(cell), "onsite", false),
+        ),
+    );
+    if (!candidate) break;
+    setMode(candidate.cell, "onsite");
+    count -= 1;
+  }
+}
+
+function enforceSuggestedDailyOnsiteCoverage(schedule, weekKey, week, weekIndex) {
+  week.forEach((date) => {
+    const dayKey = dateKey(date);
+    const special = specialFor(dayKey);
+    if (isExpiredDay(dayKey) || special?.type === "mandatory" || isClosedSpecial(special)) return;
+    const cells = state.agents.map((agent, agentIndex) => ({
+      agent,
+      agentIndex,
+      cell: schedule[weekKey]?.[agent.id]?.[dayKey],
+    }));
+    if (cells.every(({ cell }) => isClosedCell(cell))) return;
+    ensureOnsiteShift(schedule, cells, "B", weekIndex, date);
+    const bOnsiteAgent = cells.find(({ cell }) => getShift(cell) === "B" && getMode(cell) === "onsite")?.agent.id;
+    ensureOnsiteShift(schedule, cells, "A", weekIndex, date, bOnsiteAgent);
+  });
+}
+
+function enforceSuggestedFridayB(schedule, weekKey, week, attempt = 0) {
+  const friday = week.find((date) => isoDay(date) === 5 && date.getMonth() === state.month);
+  if (!friday) return;
+  const dayKey = dateKey(friday);
+  if (isExpiredDay(dayKey) || isClosedSpecial(specialFor(dayKey))) return;
+  const assignments = state.agents
+    .map((agent) => ({ agent, cell: schedule[weekKey]?.[agent.id]?.[dayKey] }))
+    .filter(({ cell }) => isEditableWorkCell(cell));
+  if (!assignments.length) return;
+  const lockedB = assignments.filter(({ cell }) => isOnsiteShift(cell, "B") && !isSuggestibleWorkCell(cell, dayKey));
+  if (lockedB.length) {
+    assignments.forEach(({ cell }) => {
+      if (isSuggestibleWorkCell(cell, dayKey) && isOnsiteShift(cell, "B")) cell.status = "A-onsite";
+    });
+    return;
+  }
+
+  const counts = monthlyFridayBCounts(
+    monthlyFridayAssignments(schedule).filter((item) => item.weekKey !== weekKey),
+  );
+  const candidates = assignments.filter(({ cell }) => isSuggestibleWorkCell(cell, dayKey));
+  if (!candidates.length) return;
+  const minCount = Math.min(...candidates.map(({ agent }) => counts.get(agent.id) || 0));
+  const fairCandidates = shuffle(candidates.filter(({ agent }) => (counts.get(agent.id) || 0) === minCount));
+  const target = fairCandidates[attempt % fairCandidates.length] || randomItem(candidates);
+  if (!target) return;
+
+  assignments.forEach(({ agent, cell }) => {
+    if (!isSuggestibleWorkCell(cell, dayKey)) return;
+    if (agent.id === target.agent.id) cell.status = "B-onsite";
+    else if (isOnsiteShift(cell, "B")) cell.status = "A-onsite";
+  });
+}
+
+function ensureSuggestedMinimumDailyRemote(schedule, weekKey, week, weekIndex) {
+  week.forEach((date) => {
+    const dayKey = dateKey(date);
+    const special = specialFor(dayKey);
+    if (isExpiredDay(dayKey) || special?.type === "mandatory" || isClosedSpecial(special)) return;
+    const activeCells = state.agents
+      .map((agent, agentIndex) => ({ agent, agentIndex, cell: schedule[weekKey]?.[agent.id]?.[dayKey] }))
+      .filter(({ cell }) => isEditableWorkCell(cell));
+    if (activeCells.length < 2 || activeCells.some(({ cell }) => getMode(cell) === "remote")) return;
+    const candidate = randomItem(
+      activeCells.filter(({ agent, cell }) =>
+        isSuggestibleWorkCell(cell, dayKey) &&
+        hasRemoteCapacityForDay(schedule, weekKey, dayKey, agent.id) &&
+        canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agent.id, getShift(cell), "remote", false),
+      ),
+    );
+    if (!candidate) return;
+    setMode(candidate.cell, "remote");
+  });
+}
+
+function scoreSuggestedWeek(schedule, weekKey, week) {
+  const weeklyIssues = weeklyRuleIssuesForSchedule(schedule);
+  const issues = weeklyIssues.get(weekKey) || [];
+  const weekIndex = Math.max(0, getMonthWeeks(state.year, state.month).findIndex((item) => dateKey(item[0]) === weekKey));
+  let score = issues.length * 1000;
+
+  state.agents.forEach((agent) => {
+    const remoteTarget = weeklyRemoteTarget(schedule, weekKey, week, agent.id, weekIndex);
+    const remoteCount = weeklyRemoteCount(schedule, weekKey, week, agent.id);
+    const bTarget = weeklyBTarget(schedule, weekKey, week, agent.id);
+    const bCount = weeklyShiftCount(schedule, weekKey, week, agent.id, "B");
+    score += Math.abs(remoteCount - remoteTarget) * 25;
+    score += Math.abs(bCount - bTarget) * 25;
+  });
+
+  week.forEach((date) => {
+    const dayKey = dateKey(date);
+    if (isExpiredDay(dayKey) || isClosedSpecial(specialFor(dayKey))) return;
+    const cells = state.agents.map((agent) => schedule[weekKey]?.[agent.id]?.[dayKey]).filter(isEditableWorkCell);
+    if (!cells.length) return;
+    const onsiteA = cells.some((cell) => getShift(cell) === "A" && getMode(cell) === "onsite");
+    const onsiteB = cells.some((cell) => getShift(cell) === "B" && getMode(cell) === "onsite");
+    if (!onsiteA) score += 120;
+    if (!onsiteB) score += 120;
+    if (!cells.some((cell) => getMode(cell) === "remote")) score += 35;
+  });
+
+  return { score, issues };
+}
+
+function weeklyRuleIssuesForSchedule(schedule) {
+  const previousSchedule = state.schedule;
+  state.schedule = schedule;
+  try {
+    return weeklyRuleIssues();
+  } finally {
+    state.schedule = previousSchedule;
+  }
+}
+
+function randomItem(items) {
+  if (!items.length) return null;
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+function shuffle(items) {
+  return items
+    .map((item) => ({ item, order: Math.random() }))
+    .sort((a, b) => a.order - b.order)
+    .map(({ item }) => item);
+}
+
 function openCellEditor(weekKey, agentId, dayKey) {
   if (!canEdit()) return;
   if (isExpiredDay(dayKey)) {

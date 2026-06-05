@@ -1068,6 +1068,7 @@ select {
 }
 
 .week-notification-toggle,
+.week-suggest,
 .week-undo,
 .week-reset {
   width: 100%;
@@ -1075,6 +1076,19 @@ select {
   margin-top: 6px;
   padding: 7px 10px;
   font-size: 12px;
+}
+
+.week-suggest {
+  border-color: var(--ucen-bright-blue);
+  background: #eef6ff;
+  color: var(--ucen-blue);
+  font-weight: 800;
+}
+
+.week-suggest:hover {
+  border-color: var(--ucen-blue);
+  background: var(--ucen-bright-blue);
+  color: #fff;
 }
 
 .week-notifications {

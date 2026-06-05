@@ -11,7 +11,11 @@ if (!payloadText) {
   localStorage.removeItem(storageKey);
   document.title = payload.title || "Exportacion semana";
   root.innerHTML = payload.html || "";
+  window.addEventListener("afterprint", () => {
+    setTimeout(() => window.close(), 250);
+  });
   setTimeout(() => {
+    window.focus();
     window.print();
   }, 350);
 }
