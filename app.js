@@ -1380,10 +1380,11 @@ function renderWeekBlock(week, weekIndex, agents, weeklyIssues, weeklyNotificati
       const displayLabel = cell.note === "Asistencia obligatoria" ? "Asistencia obligatoria" : option.label;
       const showLabel = cell.status !== "holiday";
       const showLockedMark = shouldShowLockedMark(cell, expired);
-      button.className = `cell-btn ${option.className}${cell.note === "Asistencia obligatoria" ? " status-mandatory" : ""}${expired ? " expired-cell" : ""}`;
+      const monthlyFridayClass = isMonthlyFridayBCell(cell, key) ? " status-monthly-friday-b" : "";
+      button.className = `cell-btn ${option.className}${monthlyFridayClass}${cell.note === "Asistencia obligatoria" ? " status-mandatory" : ""}${expired ? " expired-cell" : ""}`;
       button.disabled = expired || !canEdit();
       button.innerHTML = `
-        <strong>${option.code}${showLockedMark ? '<span class="locked-mark">Bloq.</span>' : ""}</strong>
+        <strong>${displayCellCode(cell, option, key)}${showLockedMark ? '<span class="locked-mark">Bloq.</span>' : ""}</strong>
         ${showLabel ? `<span>${displayLabel}</span>` : ""}
       `;
       button.addEventListener("click", () => openCellEditor(weekKey, agent.id, key));
@@ -1539,10 +1540,11 @@ function renderCalendarLegacy() {
         const displayLabel = cell.note === "Asistencia obligatoria" ? "Asistencia obligatoria" : option.label;
         const showLabel = cell.status !== "holiday";
         const showLockedMark = shouldShowLockedMark(cell, expired);
-        button.className = `cell-btn ${option.className}${cell.note === "Asistencia obligatoria" ? " status-mandatory" : ""}${expired ? " expired-cell" : ""}`;
+        const monthlyFridayClass = isMonthlyFridayBCell(cell, key) ? " status-monthly-friday-b" : "";
+        button.className = `cell-btn ${option.className}${monthlyFridayClass}${cell.note === "Asistencia obligatoria" ? " status-mandatory" : ""}${expired ? " expired-cell" : ""}`;
         button.disabled = expired || !canEdit();
         button.innerHTML = `
-          <strong>${option.code}${showLockedMark ? '<span class="locked-mark">Bloq.</span>' : ""}</strong>
+          <strong>${displayCellCode(cell, option, key)}${showLockedMark ? '<span class="locked-mark">Bloq.</span>' : ""}</strong>
           ${showLabel ? `<span>${displayLabel}</span>` : ""}
         `;
         button.addEventListener("click", () => openCellEditor(weekKey, agent.id, key));
@@ -1570,6 +1572,7 @@ function buildLegendNode(extraClass = "") {
     <span><i class="swatch admin"></i>Administrativo</span>
     <span><i class="swatch medical"></i>Licencia médica</span>
     <span><i class="swatch union"></i>Salida sindicato</span>
+    <span><i class="swatch monthly"></i>Viernes B mensual (M)</span>
     <span><i class="swatch holiday"></i>Feriado</span>
     <span><i class="swatch recess"></i>Receso institucional</span>
   `;
@@ -2328,6 +2331,16 @@ function shouldShowLockedMark(cell, expired = false) {
   return Boolean(canEdit() && (expired || cell?.note === "Bloqueo recurrente" || cell?.note === "Bloqueo manual") && !isClosedCell(cell));
 }
 
+function isMonthlyFridayBCell(cell, dayKey = "") {
+  if (!isOnsiteShift(cell, "B")) return false;
+  const date = new Date(`${dayKey}T00:00:00`);
+  return !Number.isNaN(date.getTime()) && isoDay(date) === 5 && date.getMonth() === state.month;
+}
+
+function displayCellCode(cell, option, dayKey = "") {
+  return `${option.code}${isMonthlyFridayBCell(cell, dayKey) ? " (M)" : ""}`;
+}
+
 function applyManualLockToFutureWeeks(agentId, dayKey, override) {
   const targetIsoDay = isoDay(new Date(`${dayKey}T00:00:00`));
   getMonthWeeks(state.year, state.month).forEach((week) => {
@@ -2645,7 +2658,9 @@ function scheduleWorksheetXml() {
 function scheduleXlsxCell(ref, weekKey, agentId, dayKey) {
   const cell = state.schedule[weekKey]?.[agentId]?.[dayKey] || { status: "A-onsite" };
   const option = options[cell.status] || options["A-onsite"];
-  const style = isUnionStatus(cell)
+  const style = isMonthlyFridayBCell(cell, dayKey)
+    ? "monthlyFridayB"
+    : isUnionStatus(cell)
     ? "union"
     : getMode(cell) === "remote"
       ? "remote"
@@ -2662,7 +2677,7 @@ function scheduleXlsxCell(ref, weekKey, agentId, dayKey) {
             : cell.note === "Asistencia obligatoria"
             ? "mandatory"
             : "";
-  return xlsxCell(ref, exportCode(cell, option), style || "onsite");
+  return xlsxCell(ref, exportCode(cell, option, dayKey), style || "onsite");
 }
 
 function contentTypesXml() {
@@ -2699,7 +2714,7 @@ function workbookRelsXml() {
 }
 
 function workbookStylesXml() {
-  const fills = ["FFFFFF", "EEF1F7", "CFE5FF", "6F93B3", "EAD7AA", "004680", "818F9F", "002147", "0072E5", "F4F6FA"];
+  const fills = ["FFFFFF", "EEF1F7", "CFE5FF", "6F93B3", "EAD7AA", "004680", "818F9F", "002147", "0072E5", "F4F6FA", "E8D2F0"];
   const fillXml = [
     '<fill><patternFill patternType="none"/></fill>',
     '<fill><patternFill patternType="gray125"/></fill>',
@@ -2723,6 +2738,7 @@ function workbookStylesXml() {
     { fill: 2, border: 0 },
     { fill: 2, border: 1 },
     { fill: 11, border: 1, font: 1 },
+    { fill: 12, border: 1, font: 1 },
   ];
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
   <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
@@ -2778,6 +2794,7 @@ function xlsxStyleIndex(style) {
     blank: 14,
     onsite: 15,
     expired: 16,
+    monthlyFridayB: 17,
   };
   return styles[style] ?? styles.default;
 }
@@ -2892,15 +2909,16 @@ function buildCrc32Table() {
   return table;
 }
 
-function exportCode(cell, option) {
+function exportCode(cell, option, dayKey = "") {
+  const monthlyMarker = isMonthlyFridayBCell(cell, dayKey) ? " (M)" : "";
   if (cell.status === "holiday") return "FERIADO";
   if (cell.status === "recess") return "RECESO";
   if (cell.status === "admin") return "ADMINISTRATIVO";
   if (cell.status === "admin_morning") return "ADM A";
   if (cell.status === "admin_afternoon") return "ADM B";
   if (cell.status === "medical") return "LM";
-  if (isUnionStatus(cell)) return `${getShift(cell)} SIND`;
-  return option.code.replace("-R", "");
+  if (isUnionStatus(cell)) return `${getShift(cell)} SIND${monthlyMarker}`;
+  return `${option.code.replace("-R", "")}${monthlyMarker}`;
 }
 
 function getMonthWeeks(year, month) {

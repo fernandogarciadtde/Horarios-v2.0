@@ -44,6 +44,9 @@
   --status-union-bg: #f6efe0;
   --status-union-border: #0072e5;
   --status-union-text: #002147;
+  --status-monthly-friday-bg: #e8d2f0;
+  --status-monthly-friday-border: #9f5bb5;
+  --status-monthly-friday-text: #002147;
   --ok: #0b7a4b;
   --warn: var(--ucen-navy);
   --avatar-size: 72px;
@@ -956,6 +959,11 @@ select {
   background: var(--union);
 }
 
+.swatch.monthly {
+  background: var(--status-monthly-friday-bg);
+  border-color: var(--status-monthly-friday-border);
+}
+
 .calendar-view {
   display: grid;
   gap: 16px;
@@ -1263,6 +1271,13 @@ select {
   --cell-border: var(--status-union-border);
   --cell-text: var(--status-union-text);
   box-shadow: inset 5px 0 0 var(--ucen-bright-blue);
+}
+
+.status-monthly-friday-b {
+  --cell-bg: var(--status-monthly-friday-bg);
+  --cell-border: var(--status-monthly-friday-border);
+  --cell-text: var(--status-monthly-friday-text);
+  box-shadow: inset 0 0 0 2px rgba(159, 91, 181, 0.35);
 }
 
 .expired-cell {
