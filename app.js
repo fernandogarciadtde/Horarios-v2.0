@@ -1379,7 +1379,7 @@ function renderWeekBlock(week, weekIndex, agents, weeklyIssues, weeklyNotificati
       const expired = isExpiredDay(key);
       const displayLabel = cell.note === "Asistencia obligatoria" ? "Asistencia obligatoria" : option.label;
       const showLabel = cell.status !== "holiday";
-      const showLockedMark = canEdit() && (expired || cell.note === "Bloqueo recurrente" || cell.note === "Bloqueo manual") && !isClosedCell(cell);
+      const showLockedMark = shouldShowLockedMark(cell, expired);
       button.className = `cell-btn ${option.className}${cell.note === "Asistencia obligatoria" ? " status-mandatory" : ""}${expired ? " expired-cell" : ""}`;
       button.disabled = expired || !canEdit();
       button.innerHTML = `
@@ -1538,7 +1538,7 @@ function renderCalendarLegacy() {
         const expired = isExpiredDay(key);
         const displayLabel = cell.note === "Asistencia obligatoria" ? "Asistencia obligatoria" : option.label;
         const showLabel = cell.status !== "holiday";
-        const showLockedMark = canEdit() && (expired || cell.note === "Bloqueo recurrente" || cell.note === "Bloqueo manual") && !isClosedCell(cell);
+        const showLockedMark = shouldShowLockedMark(cell, expired);
         button.className = `cell-btn ${option.className}${cell.note === "Asistencia obligatoria" ? " status-mandatory" : ""}${expired ? " expired-cell" : ""}`;
         button.disabled = expired || !canEdit();
         button.innerHTML = `
@@ -2280,7 +2280,7 @@ function openCellEditor(weekKey, agentId, dayKey) {
   syncUnionOptions(agent.name);
   el.cellStatusInput.value = cell.status;
   if (isUnionStatus(cell) && !canUseUnion(agent.name)) el.cellStatusInput.value = stripUnionStatus(cell.status);
-  if (el.cellLockedInput) el.cellLockedInput.checked = false;
+  if (el.cellLockedInput) el.cellLockedInput.checked = isManualLockActive(cell, weekKey, agentId, dayKey);
   el.cellDialog.showModal();
 }
 
@@ -2300,15 +2300,32 @@ function saveCellEdit(event) {
   const selectedStatus = specialFor(dayKey)?.type === "mandatory"
     ? `${getShift({ status: el.cellStatusInput.value }) || "A"}-onsite`
     : el.cellStatusInput.value;
+  const manualLock = Boolean(el.cellLockedInput?.checked);
   const override = {
     status: selectedStatus,
-    locked: true,
-    note: specialFor(dayKey)?.type === "mandatory" ? "Asistencia obligatoria" : "Ajuste manual",
-    source: "manual",
+    locked: manualLock,
+    note: specialFor(dayKey)?.type === "mandatory" ? "Asistencia obligatoria" : manualLock ? "Bloqueo manual" : "Ajuste manual",
+    source: manualLock ? "manual-lock" : "manual",
   };
   state.manualOverrides[key] = override;
   el.cellDialog.close();
   generateSchedule();
+}
+
+function isManualLockActive(cell, weekKey, agentId, dayKey) {
+  const override = state.manualOverrides?.[`${weekKey}|${agentId}|${dayKey}`];
+  return Boolean(
+    override?.source === "manual-lock" ||
+      override?.note === "Bloqueo manual" ||
+      override?.locked === true ||
+      cell?.note === "Bloqueo manual" ||
+      (cell?.locked === true && cell?.note === "Ajuste manual") ||
+      cell?.note === "Bloqueo recurrente",
+  );
+}
+
+function shouldShowLockedMark(cell, expired = false) {
+  return Boolean(canEdit() && (expired || cell?.note === "Bloqueo recurrente" || cell?.note === "Bloqueo manual") && !isClosedCell(cell));
 }
 
 function applyManualLockToFutureWeeks(agentId, dayKey, override) {

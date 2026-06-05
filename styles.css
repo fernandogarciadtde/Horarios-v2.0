@@ -449,6 +449,25 @@ select {
   padding: 7px 9px;
 }
 
+.lock-selector {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 70, 128, 0.18);
+  border-radius: 6px;
+  background: rgba(144, 171, 196, 0.16);
+  color: var(--ink);
+}
+
+.lock-selector input {
+  width: 18px;
+  min-height: 18px;
+  margin: 0;
+  accent-color: var(--ucen-blue);
+}
+
 .button-row,
 .section-head,
 .legend {

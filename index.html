@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Planificador Turnos Tutoría | DTDE</title>
-    <link rel="stylesheet" href="styles.css?v=week-actions-20260605" />
+    <link rel="stylesheet" href="styles.css?v=manual-day-lock-20260605" />
   </head>
   <body>
     <header class="topbar">
@@ -182,6 +182,10 @@
             <option value="recess">Receso institucional</option>
           </select>
         </label>
+        <label class="lock-selector">
+          <input id="cellLockedInput" type="checkbox" />
+          <span>bloquear turno para este d&iacute;a</span>
+        </label>
         <div class="button-row end">
           <button value="cancel">Cancelar</button>
           <button id="saveCellBtn" value="default" class="primary">Guardar</button>
@@ -235,6 +239,6 @@
       </form>
     </dialog>
 
-    <script src="app.js?v=suggest-b-balance-20260605"></script>
+    <script src="app.js?v=manual-day-lock-20260605"></script>
   </body>
 </html>
