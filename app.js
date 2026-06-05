@@ -20,6 +20,38 @@ const options = {
   "B-onsite": { shift: "B", mode: "onsite", label: "Turno B presencial", code: "B", className: "status-onsite" },
   "A-remote": { shift: "A", mode: "remote", label: "Turno A remoto", code: "A-R", className: "status-remote" },
   "B-remote": { shift: "B", mode: "remote", label: "Turno B remoto", code: "B-R", className: "status-remote" },
+  "A-onsite-admin-afternoon": {
+    shift: "A",
+    mode: "onsite",
+    adminPart: "admin_afternoon",
+    label: "Turno A presencial + ADM B tarde",
+    code: "A / ADM B",
+    className: "status-admin-combo-onsite",
+  },
+  "A-remote-admin-afternoon": {
+    shift: "A",
+    mode: "remote",
+    adminPart: "admin_afternoon",
+    label: "Turno A remoto + ADM B tarde",
+    code: "A-R / ADM B",
+    className: "status-admin-combo-remote",
+  },
+  "B-onsite-admin-morning": {
+    shift: "B",
+    mode: "onsite",
+    adminPart: "admin_morning",
+    label: "ADM A manana + Turno B presencial",
+    code: "ADM A / B",
+    className: "status-admin-combo-onsite",
+  },
+  "B-remote-admin-morning": {
+    shift: "B",
+    mode: "remote",
+    adminPart: "admin_morning",
+    label: "ADM A manana + Turno B remoto",
+    code: "ADM A / B-R",
+    className: "status-admin-combo-remote",
+  },
   "A-onsite-union": { shift: "A", mode: "onsite", label: "Turno A presencial + salida sindicato", code: "A-S", className: "status-union" },
   "B-onsite-union": { shift: "B", mode: "onsite", label: "Turno B presencial + salida sindicato", code: "B-S", className: "status-union" },
   "A-remote-union": { shift: "A", mode: "remote", label: "Turno A remoto + salida sindicato", code: "A-RS", className: "status-union" },
@@ -33,6 +65,14 @@ const options = {
 };
 
 const suggestibleStatuses = new Set(["A-onsite", "B-onsite", "A-remote", "B-remote"]);
+const partialAdminStatuses = new Set([
+  "A-onsite-admin-afternoon",
+  "A-remote-admin-afternoon",
+  "B-onsite-admin-morning",
+  "B-remote-admin-morning",
+]);
+const halfDayWeight = 0.5;
+const countTolerance = 0.001;
 
 let state = null;
 let currentUser = null;
@@ -391,7 +431,7 @@ function generateSchedule(input = {}) {
         if (special?.type === "mandatory" && absence?.type === "medical") cell = { status: "medical", locked: true, note: absenceLabel("medical") };
         else if (special?.type === "mandatory") cell = { status: "A-onsite", locked: true, note: "Asistencia obligatoria" };
         else if (isClosedSpecial(special)) cell = { status: special.type, locked: true, note: specialLabel(special.type) };
-        else if (absence) cell = { status: absence.type, locked: true, note: absenceLabel(absence.type) };
+        else if (absence) cell = absenceCell(absence);
         else if (recurringLock) cell = { status: recurringLockStatus(recurringLock), locked: true, note: "Bloqueo recurrente" };
         schedule[weekKey][agent.id][key] = cell;
       });
@@ -436,6 +476,17 @@ function scheduleOptions(input) {
   };
 }
 
+function absenceCell(absence) {
+  const status = defaultAbsenceStatus(absence?.type);
+  return { status, locked: true, note: absenceLabel(absence?.type) };
+}
+
+function defaultAbsenceStatus(type) {
+  if (type === "admin_morning") return "B-onsite-admin-morning";
+  if (type === "admin_afternoon") return "A-onsite-admin-afternoon";
+  return type;
+}
+
 function protectedWeekForCalculation(weekByAgent = {}) {
   const protectedWeek = structuredClone(weekByAgent);
   Object.values(protectedWeek).forEach((days) => {
@@ -452,16 +503,16 @@ function countProtectedFridayB(schedule, weekKey, week, fridayB) {
   const dayKey = dateKey(friday);
   state.agents.forEach((agent) => {
     const cell = schedule[weekKey]?.[agent.id]?.[dayKey];
-    if (isOnsiteShift(cell, "B")) fridayB.set(agent.id, (fridayB.get(agent.id) || 0) + 1);
+    if (isMonthlyFridayBAssignmentCell(cell)) fridayB.set(agent.id, (fridayB.get(agent.id) || 0) + 1);
   });
 }
 
 function assignMonthlyFridayB(schedule, weekKey, friday, fridayB, weekIndex) {
   const dayKey = dateKey(friday);
-  const activeAgents = activeAgentsForDay(schedule, weekKey, dayKey);
-  if (!activeAgents.length) return;
-  const minFridayB = Math.min(...activeAgents.map((agent) => fridayB.get(agent.id) || 0));
-  const candidates = activeAgents.filter((agent) => (fridayB.get(agent.id) || 0) === minFridayB);
+  const availableAgents = state.agents.filter((agent) => canAdjustWorkCell(schedule[weekKey]?.[agent.id]?.[dayKey]));
+  if (!availableAgents.length) return;
+  const minFridayB = Math.min(...availableAgents.map((agent) => fridayB.get(agent.id) || 0));
+  const candidates = availableAgents.filter((agent) => (fridayB.get(agent.id) || 0) === minFridayB);
   if (!candidates.length) return;
   const target = candidates[weekIndex % candidates.length];
   setShift(schedule[weekKey][target.id][dayKey], "B");
@@ -501,21 +552,23 @@ function recurringLockStatus(lock) {
 }
 
 function assignWeeklyB(schedule, weekKey, week, agent, agentIndex, weekIndex) {
-  let count = week.filter((date) => isWorkShift(schedule[weekKey][agent.id][dateKey(date)], "B")).length;
+  let count = weeklyShiftCount(schedule, weekKey, week, agent.id, "B");
+  const target = weeklyBTarget(schedule, weekKey, week, agent.id);
   const preferred = [...week].sort((a, b) => rotationScore(a, agentIndex, weekIndex, "B") - rotationScore(b, agentIndex, weekIndex, "B"));
   for (const date of preferred) {
-    if (count >= 2) break;
+    if (count >= target - countTolerance) break;
     const key = dateKey(date);
     const cell = schedule[weekKey][agent.id][key];
     if (!canAdjustWorkCell(cell)) continue;
     if (isWorkShift(cell, "B")) continue;
+    if (!shouldAddWorkUnit(count, workWeight(cell), target)) continue;
     setShift(cell, "B");
-    count += 1;
+    count = weeklyShiftCount(schedule, weekKey, week, agent.id, "B");
   }
 }
 
 function assignWeeklyRemote(schedule, weekKey, week, agent, agentIndex, weekIndex) {
-  let count = week.filter((date) => getMode(schedule[weekKey][agent.id][dateKey(date)]) === "remote").length;
+  let count = weeklyRemoteCount(schedule, weekKey, week, agent.id);
   const target = weeklyRemoteTarget(schedule, weekKey, week, agent.id, weekIndex);
   const preferred = [...week].sort((a, b) => {
     const scoreA = remoteScore(a, agentIndex, weekIndex);
@@ -523,26 +576,27 @@ function assignWeeklyRemote(schedule, weekKey, week, agent, agentIndex, weekInde
     return scoreA - scoreB;
   });
   for (const date of preferred) {
-    if (count >= target) break;
+    if (count >= target - countTolerance) break;
     const key = dateKey(date);
     const cell = schedule[weekKey][agent.id][key];
     if (!canAdjustWorkCell(cell) || cell.note === "Asistencia obligatoria") continue;
     if (!hasRemoteCapacityForDay(schedule, weekKey, key, agent.id)) continue;
     if (getMode(cell) === "remote") continue;
     if (isoDay(date) === 5 && isOnsiteShift(cell, "B")) continue;
+    if (!shouldAddWorkUnit(count, workWeight(cell), target)) continue;
     setMode(cell, "remote");
-    count += 1;
+    count = weeklyRemoteCount(schedule, weekKey, week, agent.id);
   }
 }
 
 function weeklyRemoteTarget(schedule, weekKey, week, agentId, weekIndex) {
-  const remoteEligibleDays = week.filter((date) => {
+  const remoteEligibleWeight = week.reduce((total, date) => {
     const cell = schedule[weekKey]?.[agentId]?.[dateKey(date)];
-    return isEditableWorkCell(cell) && cell.note !== "Asistencia obligatoria";
-  }).length;
-  if (!remoteEligibleDays) return 0;
-  if (weeklyOperationalDays(week) <= 3) return Math.min(1, remoteEligibleDays);
-  return Math.min(2, remoteEligibleDays);
+    return total + (isEditableWorkCell(cell) && cell.note !== "Asistencia obligatoria" ? workWeight(cell) : 0);
+  }, 0);
+  if (!remoteEligibleWeight) return 0;
+  if (weeklyOperationalDays(week) <= 3) return Math.min(1, remoteEligibleWeight);
+  return Math.min(2, remoteEligibleWeight);
 }
 
 function weeklyOperationalDays(week) {
@@ -574,8 +628,8 @@ function hasRemoteCapacityForDay(schedule, weekKey, dayKey, nextRemoteAgentId) {
       return agent.id === nextRemoteAgentId && isEditableWorkCell(cell) ? { status: buildStatus(getShift(cell), "remote", isUnionStatus(cell)) } : cell;
     })
     .filter(isEditableWorkCell);
-  const remoteCount = activeCells.filter((cell) => getMode(cell) === "remote").length;
-  const remoteShiftCount = activeCells.filter((cell) => getMode(cell) === "remote" && getShift(cell) === nextShift).length;
+  const remoteCount = activeCells.reduce((total, cell) => total + (getMode(cell) === "remote" ? workWeight(cell) : 0), 0);
+  const remoteShiftCount = activeCells.reduce((total, cell) => total + (getMode(cell) === "remote" && getShift(cell) === nextShift ? workWeight(cell) : 0), 0);
   return remoteCount <= dailyRemoteCapacity(schedule, weekKey, dayKey) && remoteShiftCount <= dailyRemoteShiftCapacity(schedule, weekKey, dayKey, nextShift);
 }
 
@@ -587,22 +641,22 @@ function balanceMonthlyFridayB(schedule) {
   fridayKeys.forEach((dayKey, fridayIndex) => {
     const dayAssignments = assignments.filter((item) => item.dayKey === dayKey && isEditableWorkCell(item.cell));
     if (!dayAssignments.length) return;
-    const lockedB = dayAssignments.filter((item) => isOnsiteShift(item.cell, "B") && !canAdjustWorkCell(item.cell));
+    const lockedB = dayAssignments.filter((item) => isMonthlyFridayBAssignmentCell(item.cell) && !canAdjustWorkCell(item.cell));
     const target = lockedB[0] || preferredFridayBAssignment(dayAssignments, counts, fridayIndex);
     if (!target) return;
 
     dayAssignments.forEach((item) => {
       if (item.agent.id === target.agent.id) return;
-      if (!isOnsiteShift(item.cell, "B") || !canAdjustWorkCell(item.cell)) return;
+      if (!isMonthlyFridayBAssignmentCell(item.cell) || !canAdjustWorkCell(item.cell)) return;
       item.cell.status = buildStatus("A", "onsite", isUnionStatus(item.cell));
     });
 
-    if (!isOnsiteShift(target.cell, "B") && canAdjustWorkCell(target.cell)) {
+    if (!isMonthlyFridayBAssignmentCell(target.cell) && canAdjustWorkCell(target.cell)) {
       target.cell.status = buildStatus("B", "onsite", isUnionStatus(target.cell));
     }
 
     dayAssignments
-      .filter((item) => isOnsiteShift(item.cell, "B"))
+      .filter((item) => isMonthlyFridayBAssignmentCell(item.cell))
       .forEach((item) => {
         counts.set(item.agent.id, (counts.get(item.agent.id) || 0) + 1);
       });
@@ -612,7 +666,7 @@ function balanceMonthlyFridayB(schedule) {
 }
 
 function preferredFridayBAssignment(dayAssignments, counts, fridayIndex) {
-  const candidates = dayAssignments.filter((item) => isOnsiteShift(item.cell, "B") || canAdjustWorkCell(item.cell));
+  const candidates = dayAssignments.filter((item) => isMonthlyFridayBAssignmentCell(item.cell) || canAdjustWorkCell(item.cell));
   if (!candidates.length) return null;
   const minCount = Math.min(...candidates.map((item) => counts.get(item.agent.id) || 0));
   return candidates
@@ -644,7 +698,7 @@ function monthlyFridayAssignments(schedule) {
 function monthlyFridayBCounts(assignments) {
   const counts = new Map(state.agents.map((agent) => [agent.id, 0]));
   assignments.forEach(({ agent, cell }) => {
-    if (isOnsiteShift(cell, "B")) counts.set(agent.id, (counts.get(agent.id) || 0) + 1);
+    if (isMonthlyFridayBAssignmentCell(cell)) counts.set(agent.id, (counts.get(agent.id) || 0) + 1);
   });
   return counts;
 }
@@ -754,26 +808,36 @@ function rebalanceWeeklyTargets(schedule) {
     const weekKey = dateKey(week[0]);
 
     state.agents.forEach((agent) => {
-      let bCount = week.filter((date) => isWorkShift(schedule[weekKey][agent.id][dateKey(date)], "B")).length;
-      let remoteCount = week.filter((date) => getMode(schedule[weekKey][agent.id][dateKey(date)]) === "remote").length;
+      let bCount = weeklyShiftCount(schedule, weekKey, week, agent.id, "B");
+      let remoteCount = weeklyRemoteCount(schedule, weekKey, week, agent.id);
       const remoteTarget = weeklyRemoteTarget(schedule, weekKey, week, agent.id, weekIndex);
       const bTarget = weeklyBTarget(schedule, weekKey, week, agent.id);
 
       for (const date of week) {
-        if (bCount <= bTarget) break;
+        if (bCount <= bTarget + countTolerance) break;
         const cell = schedule[weekKey][agent.id][dateKey(date)];
-        if (canAdjustWorkCell(cell) && isWorkShift(cell, "B") && canKeepDailyCoverageAfterChange(schedule, weekKey, dateKey(date), agent.id, "A", getMode(cell), isUnionStatus(cell))) {
+        if (
+          canAdjustWorkCell(cell) &&
+          isWorkShift(cell, "B") &&
+          shouldRemoveWorkUnit(bCount, workWeight(cell), bTarget) &&
+          canKeepDailyCoverageAfterChange(schedule, weekKey, dateKey(date), agent.id, "A", getMode(cell), isUnionStatus(cell))
+        ) {
           setShift(cell, "A");
-          bCount -= 1;
+          bCount = weeklyShiftCount(schedule, weekKey, week, agent.id, "B");
         }
       }
 
       for (const date of week) {
-        if (remoteCount <= remoteTarget) break;
+        if (remoteCount <= remoteTarget + countTolerance) break;
         const cell = schedule[weekKey][agent.id][dateKey(date)];
-        if (canAdjustWorkCell(cell) && getMode(cell) === "remote" && canKeepDailyCoverageAfterChange(schedule, weekKey, dateKey(date), agent.id, getShift(cell), "onsite", isUnionStatus(cell))) {
+        if (
+          canAdjustWorkCell(cell) &&
+          getMode(cell) === "remote" &&
+          shouldRemoveWorkUnit(remoteCount, workWeight(cell), remoteTarget) &&
+          canKeepDailyCoverageAfterChange(schedule, weekKey, dateKey(date), agent.id, getShift(cell), "onsite", isUnionStatus(cell))
+        ) {
           setMode(cell, "onsite");
-          remoteCount -= 1;
+          remoteCount = weeklyRemoteCount(schedule, weekKey, week, agent.id);
         }
       }
     });
@@ -820,13 +884,15 @@ function rebalanceDailyRemoteShifts(schedule, weekKey, week) {
         .map((agent) => ({ agent, cell: schedule[weekKey]?.[agent.id]?.[dayKey] }))
         .filter(({ cell }) => isEditableWorkCell(cell) && getShift(cell) === shift && getMode(cell) === "remote");
       const capacity = dailyRemoteShiftCapacity(schedule, weekKey, dayKey, shift);
+      let remoteWeight = remoteCells.reduce((total, { cell }) => total + workWeight(cell), 0);
 
       for (const { agent, cell } of remoteCells) {
-        if (remoteCells.length <= capacity) break;
+        if (remoteWeight <= capacity + countTolerance) break;
         if (!canAdjustWorkCell(cell)) continue;
         if (!canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agent.id, shift, "onsite", isUnionStatus(cell))) continue;
         setMode(cell, "onsite");
         remoteCells = remoteCells.filter((item) => item.agent.id !== agent.id);
+        remoteWeight = remoteCells.reduce((total, item) => total + workWeight(item.cell), 0);
       }
     });
   });
@@ -852,23 +918,29 @@ function canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agentId, nex
 }
 
 function weeklyShiftCount(schedule, weekKey, week, agentId, shift) {
-  return week.filter((date) => isWorkShift(schedule[weekKey]?.[agentId]?.[dateKey(date)], shift)).length;
+  return week.reduce((total, date) => {
+    const cell = schedule[weekKey]?.[agentId]?.[dateKey(date)];
+    return total + (isWorkShift(cell, shift) ? workWeight(cell) : 0);
+  }, 0);
 }
 
 function weeklyRemoteCount(schedule, weekKey, week, agentId) {
-  return week.filter((date) => getMode(schedule[weekKey]?.[agentId]?.[dateKey(date)]) === "remote").length;
+  return week.reduce((total, date) => {
+    const cell = schedule[weekKey]?.[agentId]?.[dateKey(date)];
+    return total + (getMode(cell) === "remote" ? workWeight(cell) : 0);
+  }, 0);
 }
 
 function weeklyBTarget(schedule, weekKey, week, agentId) {
-  const eligibleDays = week.filter((date) => isEditableWorkCell(schedule[weekKey]?.[agentId]?.[dateKey(date)])).length;
-  return Math.min(2, eligibleDays);
+  const eligibleWeight = week.reduce((total, date) => total + workWeight(schedule[weekKey]?.[agentId]?.[dateKey(date)]), 0);
+  return Math.min(2, eligibleWeight);
 }
 
 function monthlyOnsiteShiftCount(agentId, shift, schedule) {
   let count = 0;
   Object.values(schedule || {}).forEach((weekByAgent) => {
     Object.values(weekByAgent[agentId] || {}).forEach((cell) => {
-      if (getShift(cell) === shift && getMode(cell) === "onsite") count += 1;
+      if (getShift(cell) === shift && getMode(cell) === "onsite") count += workWeight(cell);
     });
   });
   return count;
@@ -885,18 +957,14 @@ function rotationScore(date, agentIndex, weekIndex, shift) {
   return (isoDay(date) + agentIndex + weekIndex + offset) % 5;
 }
 
-function activeAgentsForDay(schedule, weekKey, dayKey) {
-  return state.agents.filter((agent) => isEditableWorkCell(schedule[weekKey][agent.id][dayKey]));
-}
-
 function setShift(cell, shift) {
   if (!isEditableWorkCell(cell)) return;
-  cell.status = buildStatus(shift, getMode(cell), isUnionStatus(cell));
+  cell.status = buildStatus(shift, getMode(cell), isUnionStatus(cell), getAdminPart(cell));
 }
 
 function setMode(cell, mode) {
   if (!isEditableWorkCell(cell)) return;
-  cell.status = buildStatus(getShift(cell), mode, isUnionStatus(cell));
+  cell.status = buildStatus(getShift(cell), mode, isUnionStatus(cell), getAdminPart(cell));
 }
 
 function isWorkShift(cell, shift) {
@@ -912,7 +980,7 @@ function isEditableWorkCell(cell) {
 }
 
 function canAdjustWorkCell(cell) {
-  return isEditableWorkCell(cell) && !cell.locked;
+  return isEditableWorkCell(cell) && !cell.locked && !isPartialAdminStatus(cell?.status);
 }
 
 function isClosedSpecial(special) {
@@ -928,6 +996,7 @@ function isUnavailableStatus(status) {
 }
 
 function absenceLabel(type) {
+  if (options[type]?.adminPart) return options[type].label;
   const labels = {
     admin: "Día administrativo",
     admin_morning: "ADM A mañana (8:30 - 13:30)",
@@ -948,6 +1017,7 @@ function specialLabel(type) {
 
 function getShift(cell) {
   if (!cell?.status) return null;
+  if (options[cell.status]?.shift) return options[cell.status].shift;
   if (cell.status === "admin_morning") return "A";
   if (cell.status === "admin_afternoon") return "B";
   if (cell.status.startsWith("A-")) return "A";
@@ -957,6 +1027,7 @@ function getShift(cell) {
 
 function getMode(cell) {
   if (!cell?.status) return null;
+  if (["onsite", "remote"].includes(options[cell.status]?.mode)) return options[cell.status].mode;
   if (["admin_morning", "admin_afternoon"].includes(cell.status)) return "admin";
   if (cell.status.includes("-remote")) return "remote";
   if (cell.status.includes("-onsite")) return "onsite";
@@ -967,8 +1038,48 @@ function isUnionStatus(cell) {
   return Boolean(cell?.status?.endsWith("-union"));
 }
 
-function buildStatus(shift, mode, union = false) {
-  return `${shift}-${mode}${union ? "-union" : ""}`;
+function isPartialAdminStatus(status) {
+  return partialAdminStatuses.has(status);
+}
+
+function getAdminPart(cell) {
+  return options[cell?.status]?.adminPart || "";
+}
+
+function validAdminPartForShift(shift, adminPart) {
+  if (!adminPart) return false;
+  return (shift === "A" && adminPart === "admin_afternoon") || (shift === "B" && adminPart === "admin_morning");
+}
+
+function workWeight(cell) {
+  if (!isEditableWorkCell(cell)) return 0;
+  return isPartialAdminStatus(cell.status) ? halfDayWeight : 1;
+}
+
+function countsDiffer(current, target) {
+  return Math.abs(current - target) > countTolerance;
+}
+
+function shouldAddWorkUnit(current, weight, target) {
+  if (current >= target - countTolerance) return false;
+  return Math.abs(current + weight - target) < Math.abs(current - target);
+}
+
+function shouldRemoveWorkUnit(current, weight, target) {
+  if (current <= target + countTolerance) return false;
+  return Math.abs(current - weight - target) <= Math.abs(current - target);
+}
+
+function formatCount(value) {
+  const rounded = Math.round(value * 10) / 10;
+  if (Math.abs(rounded - Math.round(rounded)) < countTolerance) return String(Math.round(rounded));
+  return String(rounded).replace(".", ",");
+}
+
+function buildStatus(shift, mode, union = false, adminPart = "") {
+  const normalizedAdminPart = validAdminPartForShift(shift, adminPart) && !union ? adminPart : "";
+  const suffix = normalizedAdminPart === "admin_morning" ? "-admin-morning" : normalizedAdminPart === "admin_afternoon" ? "-admin-afternoon" : "";
+  return `${shift}-${mode}${union ? "-union" : ""}${suffix}`;
 }
 
 function lockExpiredDays(schedule, previousSchedule) {
@@ -1480,6 +1591,7 @@ function buildLegendNode(extraClass = "") {
     <span><i class="swatch onsite"></i>Disponible presencial</span>
     <span><i class="swatch remote"></i>Remoto</span>
     <span><i class="swatch admin"></i>Administrativo</span>
+    <span><i class="swatch admin-combo"></i>Media jornada ADM + turno</span>
     <span><i class="swatch medical"></i>Licencia médica</span>
     <span><i class="swatch union"></i>Salida sindicato</span>
     <span><i class="swatch monthly"></i>Viernes B mensual (M)</span>
@@ -1549,7 +1661,7 @@ function renderRules() {
       <p class="rule-message"><strong>Resumen del calendario:</strong></p>
       <ul class="rules-summary-list">
         <li>Organiza los turnos semanales del equipo seg&uacute;n mes, feriados, ausencias y bloqueos definidos.</li>
-        <li>Cada celda representa un bloque diario completo con tutor, turno, modalidad o estado especial.</li>
+        <li>Cada celda representa un bloque diario completo o una media jornada administrativa combinada con turno activo.</li>
         <li>El c&aacute;lculo prioriza cobertura presencial en A y B, distribuyendo remotos y turnos B de manera proporcional.</li>
         <li>Los d&iacute;as vencidos quedan bloqueados y los ajustes manuales se respetan en los rec&aacute;lculos posteriores.</li>
         <li>Las incongruencias se informan bajo cada semana para apoyar la decisi&oacute;n operativa sin impedir la edici&oacute;n.</li>
@@ -1580,23 +1692,24 @@ function weeklyRuleIssues() {
         .map((date) => ({ date, key: dateKey(date), cell: state.schedule[weekKey]?.[agent.id]?.[dateKey(date)] }))
         .filter(({ cell, key }) => cell && !isExpiredDay(key));
       const workCells = cells.filter(({ cell }) => isEditableWorkCell(cell));
-      const remote = workCells.filter(({ cell }) => getMode(cell) === "remote").length;
+      const workWeightTotal = workCells.reduce((total, { cell }) => total + workWeight(cell), 0);
+      const remote = weeklyRemoteCount(state.schedule, weekKey, week, agent.id);
       const remoteTarget = weeklyRemoteTarget(state.schedule, weekKey, week, agent.id, weekIndex);
-      const bShifts = workCells.filter(({ cell }) => isWorkShift(cell, "B")).length;
+      const bShifts = weeklyShiftCount(state.schedule, weekKey, week, agent.id, "B");
       const bTarget = weeklyBTarget(state.schedule, weekKey, week, agent.id);
       const unavailable = cells.filter(({ cell }) => isUnavailableStatus(cell.status)).length;
-      if (workCells.length >= 2 && remote !== remoteTarget) {
-        issues.push(`${agent.name}: tiene ${remote} remoto(s), deben ser ${remoteTarget}.`);
+      if (workWeightTotal >= 2 && countsDiffer(remote, remoteTarget)) {
+        issues.push(`${agent.name}: tiene ${formatCount(remote)} remoto(s), deben ser ${formatCount(remoteTarget)}.`);
       }
-      if (workCells.length >= 2 && bShifts !== bTarget) {
-        issues.push(`${agent.name}: tiene ${bShifts} turno(s) B, deben ser ${bTarget}.`);
+      if (workWeightTotal >= 2 && countsDiffer(bShifts, bTarget)) {
+        issues.push(`${agent.name}: tiene ${formatCount(bShifts)} turno(s) B, deben ser ${formatCount(bTarget)}.`);
       }
       if (workCells.length < 2 && unavailable > 0 && !hasPermanentMedicalAbsence(agent.id)) {
         issues.push(`${agent.name}: ausencia/feriado impide completar proporcionalidad semanal.`);
       }
       cells.forEach(({ date, cell }) => {
         if (isoDay(date) === 5 && date.getMonth() === state.month && isEditableWorkCell(cell) && !monthFridayWeek.has(agent.id)) monthFridayWeek.set(agent.id, weekKey);
-        if (isoDay(date) === 5 && date.getMonth() === state.month && isOnsiteShift(cell, "B")) monthFridayB.set(agent.id, (monthFridayB.get(agent.id) || 0) + 1);
+        if (isoDay(date) === 5 && date.getMonth() === state.month && isMonthlyFridayBAssignmentCell(cell)) monthFridayB.set(agent.id, (monthFridayB.get(agent.id) || 0) + 1);
       });
     });
 
@@ -1610,8 +1723,8 @@ function weeklyRuleIssues() {
       const activeCells = dayCells.filter(isEditableWorkCell);
       const onsiteA = activeCells.some((cell) => getShift(cell) === "A" && getMode(cell) === "onsite");
       const onsiteB = activeCells.some((cell) => getShift(cell) === "B" && getMode(cell) === "onsite");
-      const remoteA = activeCells.filter((cell) => getShift(cell) === "A" && getMode(cell) === "remote").length;
-      const remoteB = activeCells.filter((cell) => getShift(cell) === "B" && getMode(cell) === "remote").length;
+      const remoteA = activeCells.reduce((total, cell) => total + (getShift(cell) === "A" && getMode(cell) === "remote" ? workWeight(cell) : 0), 0);
+      const remoteB = activeCells.reduce((total, cell) => total + (getShift(cell) === "B" && getMode(cell) === "remote" ? workWeight(cell) : 0), 0);
       const remoteTotal = remoteA + remoteB;
       if (activeCells.length >= 2 && (!onsiteA || !onsiteB)) {
         issues.push(`${dayNames[isoDay(date) - 1]} ${formatDate(dayKey)}: debe haber al menos un tutor presencial en A y uno presencial en B.`);
@@ -1649,7 +1762,7 @@ function addMonthlyFridayRotationIssues(byWeek) {
 
   fridayKeys.forEach((dayKey) => {
     const weekKey = assignments.find((item) => item.dayKey === dayKey)?.weekKey || dayKey;
-    const fridayB = assignments.filter((item) => item.dayKey === dayKey && activeIds.has(item.agent.id) && isOnsiteShift(item.cell, "B"));
+    const fridayB = assignments.filter((item) => item.dayKey === dayKey && activeIds.has(item.agent.id) && isMonthlyFridayBAssignmentCell(item.cell));
     if (!fridayB.length) {
       const issues = byWeek.get(weekKey) || [];
       issues.push(`${dayNames[4]} ${formatDate(dayKey)}: debe existir un tutor en viernes B presencial.`);
@@ -1690,7 +1803,7 @@ function addMonthlyFridayRotationIssues(byWeek) {
 }
 
 function monthFridayWeekForAgent(assignments, agentId) {
-  const assignment = assignments.find((item) => item.agent.id === agentId && isOnsiteShift(item.cell, "B"));
+  const assignment = assignments.find((item) => item.agent.id === agentId && isMonthlyFridayBAssignmentCell(item.cell));
   return assignment?.weekKey || "";
 }
 
@@ -1728,18 +1841,18 @@ function addShortDayDistributionIssues(issues, weekKey, week) {
   const activeAgents = state.agents.filter((agent) => !hasPermanentMedicalAbsence(agent.id));
   if (activeAgents.length < 2) return;
   const counts = activeAgents.map((agent) => {
-    const shortRemote = week.filter((date) => {
-      if (isoDay(date) < 3) return false;
+    const shortRemote = week.reduce((total, date) => {
+      if (isoDay(date) < 3) return total;
       const cell = state.schedule[weekKey]?.[agent.id]?.[dateKey(date)];
-      return isEditableWorkCell(cell) && getMode(cell) === "remote";
-    }).length;
+      return total + (isEditableWorkCell(cell) && getMode(cell) === "remote" ? workWeight(cell) : 0);
+    }, 0);
     return { agent, shortRemote };
   });
   const values = counts.map((item) => item.shortRemote);
   const min = Math.min(...values);
   const max = Math.max(...values);
   if (max - min <= 1) return;
-  const detail = counts.map((item) => `${item.agent.name}: ${item.shortRemote}`).join(", ");
+  const detail = counts.map((item) => `${item.agent.name}: ${formatCount(item.shortRemote)}`).join(", ");
   issues.push(`Miércoles a viernes: los remotos de jornada corta no están distribuidos equitativamente (${detail}).`);
 }
 
@@ -1853,7 +1966,11 @@ function balanceSuggestedDailyShiftDistribution(schedule, weekKey, week, weekInd
         .filter(({ agent, cell }) =>
           isSuggestibleWorkCell(cell, dayKey) &&
           getShift(cell) === "A" &&
-          weeklyShiftCount(schedule, weekKey, week, agent.id, "B") < weeklyBTarget(schedule, weekKey, week, agent.id),
+          shouldAddWorkUnit(
+            weeklyShiftCount(schedule, weekKey, week, agent.id, "B"),
+            workWeight(cell),
+            weeklyBTarget(schedule, weekKey, week, agent.id),
+          ),
         )
         .sort((a, b) => {
           const aCount = weeklyShiftCount(schedule, weekKey, week, a.agent.id, "B");
@@ -1871,7 +1988,11 @@ function balanceSuggestedDailyShiftDistribution(schedule, weekKey, week, weekInd
         .filter(({ agent, cell }) =>
           isSuggestibleWorkCell(cell, dayKey) &&
           getShift(cell) === "B" &&
-          weeklyShiftCount(schedule, weekKey, week, agent.id, "B") > weeklyBTarget(schedule, weekKey, week, agent.id) &&
+          shouldRemoveWorkUnit(
+            weeklyShiftCount(schedule, weekKey, week, agent.id, "B"),
+            workWeight(cell),
+            weeklyBTarget(schedule, weekKey, week, agent.id),
+          ) &&
           canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agent.id, "A", getMode(cell), false),
         )
         .sort((a, b) => {
@@ -1892,7 +2013,7 @@ function assignSuggestedWeeklyB(schedule, weekKey, week, agent) {
   let count = weeklyShiftCount(schedule, weekKey, week, agent.id, "B");
   let guard = 0;
 
-  while (count < target && guard < 10) {
+  while (count < target - countTolerance && guard < 10) {
     guard += 1;
     const candidate = randomItem(
       week
@@ -1900,16 +2021,17 @@ function assignSuggestedWeeklyB(schedule, weekKey, week, agent) {
         .filter(({ dayKey, cell }) =>
           isSuggestibleWorkCell(cell, dayKey) &&
           getShift(cell) === "A" &&
+          shouldAddWorkUnit(count, workWeight(cell), target) &&
           canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agent.id, "B", getMode(cell), false),
         ),
     );
     if (!candidate) break;
     setShift(candidate.cell, "B");
-    count += 1;
+    count = weeklyShiftCount(schedule, weekKey, week, agent.id, "B");
   }
 
   guard = 0;
-  while (count > target && guard < 10) {
+  while (count > target + countTolerance && guard < 10) {
     guard += 1;
     const candidate = randomItem(
       week
@@ -1917,12 +2039,13 @@ function assignSuggestedWeeklyB(schedule, weekKey, week, agent) {
         .filter(({ dayKey, cell }) =>
           isSuggestibleWorkCell(cell, dayKey) &&
           getShift(cell) === "B" &&
+          shouldRemoveWorkUnit(count, workWeight(cell), target) &&
           canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agent.id, "A", getMode(cell), false),
         ),
     );
     if (!candidate) break;
     setShift(candidate.cell, "A");
-    count -= 1;
+    count = weeklyShiftCount(schedule, weekKey, week, agent.id, "B");
   }
 }
 
@@ -1931,7 +2054,7 @@ function assignSuggestedWeeklyRemote(schedule, weekKey, week, agent, weekIndex) 
   let count = weeklyRemoteCount(schedule, weekKey, week, agent.id);
   let guard = 0;
 
-  while (count < target && guard < 10) {
+  while (count < target - countTolerance && guard < 10) {
     guard += 1;
     const candidate = randomItem(
       week
@@ -1940,17 +2063,18 @@ function assignSuggestedWeeklyRemote(schedule, weekKey, week, agent, weekIndex) 
           isSuggestibleWorkCell(cell, dayKey) &&
           getMode(cell) === "onsite" &&
           !(isoDay(date) === 5 && getShift(cell) === "B") &&
+          shouldAddWorkUnit(count, workWeight(cell), target) &&
           hasRemoteCapacityForDay(schedule, weekKey, dayKey, agent.id) &&
           canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agent.id, getShift(cell), "remote", false),
         ),
     );
     if (!candidate) break;
     setMode(candidate.cell, "remote");
-    count += 1;
+    count = weeklyRemoteCount(schedule, weekKey, week, agent.id);
   }
 
   guard = 0;
-  while (count > target && guard < 10) {
+  while (count > target + countTolerance && guard < 10) {
     guard += 1;
     const candidate = randomItem(
       week
@@ -1958,12 +2082,13 @@ function assignSuggestedWeeklyRemote(schedule, weekKey, week, agent, weekIndex) 
         .filter(({ dayKey, cell }) =>
           isSuggestibleWorkCell(cell, dayKey) &&
           getMode(cell) === "remote" &&
+          shouldRemoveWorkUnit(count, workWeight(cell), target) &&
           canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agent.id, getShift(cell), "onsite", false),
         ),
     );
     if (!candidate) break;
     setMode(candidate.cell, "onsite");
-    count -= 1;
+    count = weeklyRemoteCount(schedule, weekKey, week, agent.id);
   }
 }
 
@@ -1975,13 +2100,15 @@ function rebalanceSuggestedDailyRemoteShifts(schedule, weekKey, week) {
         .map((agent) => ({ agent, cell: schedule[weekKey]?.[agent.id]?.[dayKey] }))
         .filter(({ cell }) => isEditableWorkCell(cell) && getShift(cell) === shift && getMode(cell) === "remote");
       const capacity = dailyRemoteShiftCapacity(schedule, weekKey, dayKey, shift);
+      let remoteWeight = remoteCells.reduce((total, { cell }) => total + workWeight(cell), 0);
 
       for (const { agent, cell } of remoteCells) {
-        if (remoteCells.length <= capacity) break;
+        if (remoteWeight <= capacity + countTolerance) break;
         if (!isSuggestibleWorkCell(cell, dayKey)) continue;
         if (!canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agent.id, shift, "onsite", false)) continue;
         setMode(cell, "onsite");
         remoteCells = remoteCells.filter((item) => item.agent.id !== agent.id);
+        remoteWeight = remoteCells.reduce((total, item) => total + workWeight(item.cell), 0);
       }
     });
   });
@@ -2029,10 +2156,10 @@ function enforceSuggestedFridayB(schedule, weekKey, week, attempt = 0) {
     .map((agent) => ({ agent, cell: schedule[weekKey]?.[agent.id]?.[dayKey] }))
     .filter(({ cell }) => isEditableWorkCell(cell));
   if (!assignments.length) return;
-  const lockedB = assignments.filter(({ cell }) => isOnsiteShift(cell, "B") && !isSuggestibleWorkCell(cell, dayKey));
+  const lockedB = assignments.filter(({ cell }) => isMonthlyFridayBAssignmentCell(cell) && !isSuggestibleWorkCell(cell, dayKey));
   if (lockedB.length) {
     assignments.forEach(({ cell }) => {
-      if (isSuggestibleWorkCell(cell, dayKey) && isOnsiteShift(cell, "B")) cell.status = "A-onsite";
+      if (isSuggestibleWorkCell(cell, dayKey) && isMonthlyFridayBAssignmentCell(cell)) cell.status = "A-onsite";
     });
     return;
   }
@@ -2052,7 +2179,7 @@ function enforceSuggestedFridayB(schedule, weekKey, week, attempt = 0) {
   assignments.forEach(({ agent, cell }) => {
     if (!isSuggestibleWorkCell(cell, dayKey)) return;
     if (agent.id === target.agent.id) cell.status = "B-onsite";
-    else if (isOnsiteShift(cell, "B")) cell.status = "A-onsite";
+    else if (isMonthlyFridayBAssignmentCell(cell)) cell.status = "A-onsite";
   });
   trimSuggestedWeeklyBOverflow(schedule, weekKey, week, target.agent.id, dayKey);
 }
@@ -2061,8 +2188,8 @@ function canAgentHoldSuggestedFridayB(schedule, weekKey, week, agentId, fridayKe
   const target = weeklyBTarget(schedule, weekKey, week, agentId);
   const currentCount = weeklyShiftCount(schedule, weekKey, week, agentId, "B");
   const fridayCell = schedule[weekKey]?.[agentId]?.[fridayKey];
-  const nextCount = currentCount + (getShift(fridayCell) === "B" ? 0 : 1);
-  if (nextCount <= target) return true;
+  const nextCount = currentCount + (getShift(fridayCell) === "B" ? 0 : workWeight(fridayCell));
+  if (nextCount <= target + countTolerance) return true;
   return suggestedBOverflowCandidates(schedule, weekKey, week, agentId, fridayKey).length > 0;
 }
 
@@ -2075,23 +2202,26 @@ function trimSuggestedWeeklyBOverflow(schedule, weekKey, week, preferredAgentId 
     let count = weeklyShiftCount(schedule, weekKey, week, agent.id, "B");
     const target = weeklyBTarget(schedule, weekKey, week, agent.id);
     let guard = 0;
-    while (count > target && guard < 10) {
+    while (count > target + countTolerance && guard < 10) {
       guard += 1;
       const candidate = suggestedBOverflowCandidates(schedule, weekKey, week, agent.id, protectedDayKey)[0];
       if (!candidate) break;
       setShift(candidate.cell, "A");
-      count -= 1;
+      count = weeklyShiftCount(schedule, weekKey, week, agent.id, "B");
     }
   });
 }
 
 function suggestedBOverflowCandidates(schedule, weekKey, week, agentId, protectedDayKey = "") {
+  const currentCount = weeklyShiftCount(schedule, weekKey, week, agentId, "B");
+  const target = weeklyBTarget(schedule, weekKey, week, agentId);
   return week
     .map((date) => ({ date, dayKey: dateKey(date), cell: schedule[weekKey]?.[agentId]?.[dateKey(date)] }))
     .filter(({ dayKey, cell }) =>
       dayKey !== protectedDayKey &&
       isSuggestibleWorkCell(cell, dayKey) &&
       getShift(cell) === "B" &&
+      shouldRemoveWorkUnit(currentCount, workWeight(cell), target) &&
       canKeepDailyCoverageAfterChange(schedule, weekKey, dayKey, agentId, "A", getMode(cell), false),
     )
     .sort((a, b) => {
@@ -2206,9 +2336,10 @@ function saveCellEdit(event) {
   }
   const key = `${weekKey}|${agentId}|${dayKey}`;
   pushUndoSnapshot();
+  const rawSelectedStatus = el.cellStatusInput.value;
   const selectedStatus = specialFor(dayKey)?.type === "mandatory"
-    ? `${getShift({ status: el.cellStatusInput.value }) || "A"}-onsite`
-    : el.cellStatusInput.value;
+    ? `${getShift({ status: rawSelectedStatus }) || "A"}-onsite`
+    : defaultAbsenceStatus(rawSelectedStatus);
   const manualLock = Boolean(el.cellLockedInput?.checked);
   const override = {
     status: selectedStatus,
@@ -2238,9 +2369,13 @@ function shouldShowLockedMark(cell, expired = false) {
 }
 
 function isMonthlyFridayBCell(cell, dayKey = "") {
-  if (!isOnsiteShift(cell, "B")) return false;
+  if (!isMonthlyFridayBAssignmentCell(cell)) return false;
   const date = new Date(`${dayKey}T00:00:00`);
   return !Number.isNaN(date.getTime()) && isoDay(date) === 5;
+}
+
+function isMonthlyFridayBAssignmentCell(cell) {
+  return isOnsiteShift(cell, "B") && !isPartialAdminStatus(cell?.status);
 }
 
 function displayCellCode(cell, option, dayKey = "") {

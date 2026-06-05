@@ -71,9 +71,10 @@
               y bloqueos recurrentes.
             </p>
             <p>
-              La herramienta no divide la jornada por hora. Cada celda representa un bloque diario completo:
-              tutor, fecha, turno y modalidad. La excepci&oacute;n conceptual es salida sindicato, que descuenta
-              las tres &uacute;ltimas horas de la jornada, pero se mantiene asociada al turno y modalidad del d&iacute;a.
+              La herramienta no divide la jornada por hora, pero s&iacute; permite estados de media jornada administrativa.
+              Cada celda representa un bloque diario completo o una combinaci&oacute;n de medio administrativo con medio
+              turno activo. Salida sindicato descuenta las tres &uacute;ltimas horas de la jornada, pero se mantiene
+              asociada al turno y modalidad del d&iacute;a.
             </p>
           </section>
 
@@ -145,6 +146,8 @@
               <span class="status-item admin"><i class="swatch admin"></i> Administrativo</span>
               <span class="status-item admin"><i class="swatch admin"></i> ADM A ma&ntilde;ana</span>
               <span class="status-item admin"><i class="swatch admin"></i> ADM B tarde</span>
+              <span class="status-item admin"><i class="swatch admin-combo"></i> ADM A + Turno B presencial/remoto</span>
+              <span class="status-item admin"><i class="swatch admin-combo"></i> Turno A presencial/remoto + ADM B</span>
               <span class="status-item medical"><i class="swatch medical"></i> Licencia m&eacute;dica</span>
               <span class="status-item union"><i class="swatch union"></i> Salida sindicato</span>
               <span class="status-item monthly"><i class="swatch monthly"></i> Viernes B mensual (M)</span>
@@ -153,8 +156,9 @@
             </div>
             <p>
               Los estados administrativo y licencia m&eacute;dica se consideran ausencia para efectos de dotaci&oacute;n.
-              Feriado y receso cierran el d&iacute;a para el c&aacute;lculo. Asistencia obligatoria fuerza presencialidad
-              y no exige remoto en ese d&iacute;a.
+              ADM A y ADM B pueden usarse como media jornada cuando se combinan con un turno activo. Feriado y
+              receso cierran el d&iacute;a para el c&aacute;lculo. Asistencia obligatoria fuerza presencialidad y no exige
+              remoto en ese d&iacute;a.
             </p>
             <p>
               El estado visual <strong>B (M)</strong> identifica el viernes B presencial que participa en la rotaci&oacute;n
@@ -168,6 +172,7 @@
               <li>Lee el mes, a&ntilde;o, tutores activos, feriados, recesos, ausencias y bloqueos.</li>
               <li>Construye las semanas visibles del mes.</li>
               <li>Marca primero los d&iacute;as cerrados, licencias m&eacute;dicas, administrativos y bloqueos recurrentes.</li>
+              <li>Convierte ADM A y ADM B de media jornada en combinaciones de turno activo con peso 0,5.</li>
               <li>Asigna turnos A y B buscando una distribuci&oacute;n proporcional.</li>
               <li>Asigna remotos respetando cobertura presencial diaria.</li>
               <li>Ajusta viernes B presencial con rotaci&oacute;n mensual.</li>
@@ -188,12 +193,14 @@
             <p>
               Cada tutor activo debe tener 2 d&iacute;as remotos por semana. Si una semana queda reducida a 3 d&iacute;as
               laborales o menos por feriados, recesos o cierres, el objetivo baja a 1 remoto proporcional.
+              Cuando existe media jornada administrativa, el remoto asociado cuenta como 0,5 para evitar sobreestimar
+              la disponibilidad real.
             </p>
             <h4>Turnos B</h4>
             <p>
               Cada tutor activo debe tener 2 turnos B por semana cuando tiene al menos 2 bloques trabajables.
               Si una ausencia, feriado, receso o bloqueo deja menos bloques disponibles, el objetivo se reduce al
-              total de bloques trabajables de esa persona.
+              total de bloques trabajables de esa persona. Un bloque combinado ADM A + B cuenta como 0,5 turno B.
             </p>
             <h4>Cobertura presencial diaria</h4>
             <p>
@@ -229,8 +236,9 @@
             </p>
             <ul>
               <li><strong>D&iacute;a administrativo:</strong> bloque ausente completo.</li>
-              <li><strong>ADM A ma&ntilde;ana:</strong> ausencia parcial asociada al tramo A.</li>
-              <li><strong>ADM B tarde:</strong> ausencia parcial asociada al tramo B.</li>
+              <li><strong>ADM A ma&ntilde;ana:</strong> media jornada administrativa que puede combinarse con Turno B presencial o remoto.</li>
+              <li><strong>ADM B tarde:</strong> media jornada administrativa que puede combinarse con Turno A presencial o remoto.</li>
+              <li><strong>Bloques combinados:</strong> cuentan como 0,5 turno activo y 0,5 administrativo; sugerir turnos no los sobreescribe.</li>
               <li><strong>Licencia m&eacute;dica:</strong> puede tener fecha desde, fecha hasta o quedar indefinida.</li>
               <li><strong>Feriado:</strong> cierra el d&iacute;a y se despliega en gris.</li>
               <li><strong>Receso institucional:</strong> cierra el d&iacute;a como evento institucional.</li>
@@ -257,7 +265,7 @@
               <li>Cristopher abre el calendario con perfil administrador.</li>
               <li>Selecciona el mes y vista de trabajo: mes completo, semana o vista personal.</li>
               <li>Hace clic sobre el bloque del tutor y d&iacute;a que necesita modificar.</li>
-              <li>Selecciona el estado del bloque: A presencial, B presencial, remoto, administrativo, licencia, feriado, receso o sindicato.</li>
+              <li>Selecciona el estado del bloque: A presencial, B presencial, remoto, administrativo, ADM de media jornada combinada, licencia, feriado, receso o sindicato.</li>
               <li>Guarda el cambio. El sistema recalcula manteniendo el ajuste manual como prioridad.</li>
               <li>Revisa el panel de incongruencias de la semana.</li>
               <li>Si la necesidad operativa justifica la incongruencia, puede mantener el cambio de todos modos.</li>
@@ -274,6 +282,7 @@
             <ul>
               <li>Un tutor tiene m&aacute;s o menos remotos que los esperados.</li>
               <li>Un tutor tiene m&aacute;s o menos turnos B que el objetivo semanal de 2.</li>
+              <li>Un tutor queda con conteos parciales, por ejemplo 1,5 remotos o 1,5 turnos B por media jornada administrativa.</li>
               <li>No existe cobertura presencial A y B en un d&iacute;a h&aacute;bil abierto.</li>
               <li>Hay remotos excesivos dentro del mismo turno.</li>
               <li>No hay dotaci&oacute;n suficiente por licencias, administrativos, feriados o recesos.</li>

@@ -14,6 +14,7 @@ Esta es la version oficial del proyecto. Se ejecuta con Python en el computador 
 - Persistencia local en `local_data/state.json` y `local_data/users.json`.
 - Reglas de turnos, ausencias, feriados, bloqueos recurrentes y validacion visual.
 - Exportacion semanal en PDF desde el navegador.
+- Administrativos de media jornada combinables con turno activo, ponderados como `0,5` en el calculo semanal.
 - Estado `salida anticipada sindicato`: toma las tres ultimas horas de una jornada y mantiene el conteo dentro del turno asignado.
 
 ## Requisitos

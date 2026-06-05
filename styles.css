@@ -959,6 +959,11 @@ select {
   background: var(--admin);
 }
 
+.swatch.admin-combo {
+  background: linear-gradient(135deg, var(--remote) 0 50%, var(--admin) 50% 100%);
+  border-color: var(--status-admin-border);
+}
+
 .swatch.medical {
   background: var(--medical);
 }
@@ -1212,6 +1217,8 @@ select {
 
 .cell-btn.status-admin:hover,
 .cell-btn.status-admin-partial:hover,
+.cell-btn.status-admin-combo-onsite:hover,
+.cell-btn.status-admin-combo-remote:hover,
 .cell-btn.status-medical:hover,
 .cell-btn.status-holiday:hover,
 .cell-btn.status-recess:hover,
@@ -1254,6 +1261,18 @@ select {
 
 .status-admin-partial {
   --cell-bg: linear-gradient(135deg, var(--status-admin-bg) 0 50%, #ffffff 50% 100%);
+  --cell-border: var(--status-admin-border);
+  --cell-text: var(--status-admin-text);
+}
+
+.status-admin-combo-onsite {
+  --cell-bg: linear-gradient(135deg, var(--status-onsite-bg) 0 50%, var(--status-admin-bg) 50% 100%);
+  --cell-border: var(--status-admin-border);
+  --cell-text: var(--status-admin-text);
+}
+
+.status-admin-combo-remote {
+  --cell-bg: linear-gradient(135deg, var(--status-remote-bg) 0 50%, var(--status-admin-bg) 50% 100%);
   --cell-border: var(--status-admin-border);
   --cell-text: var(--status-admin-text);
 }
