@@ -1520,11 +1520,10 @@ function renderWeekBlock(week, weekIndex, agents, weeklyIssues, weeklyNotificati
       const displayLabel = cell.note === "Asistencia obligatoria" ? "Asistencia obligatoria" : option.label;
       const showLabel = cell.status !== "holiday";
       const showLockedMark = shouldShowLockedMark(cell, expired);
-      const monthlyFridayClass = isMonthlyFridayBCell(cell, key) ? " status-monthly-friday-b" : "";
-      button.className = `cell-btn ${option.className}${monthlyFridayClass}${cell.note === "Asistencia obligatoria" ? " status-mandatory" : ""}${expired ? " expired-cell" : ""}`;
+      button.className = `cell-btn ${option.className}${cell.note === "Asistencia obligatoria" ? " status-mandatory" : ""}${expired ? " expired-cell" : ""}`;
       button.disabled = expired || !canEdit();
       button.innerHTML = `
-        <strong>${displayCellCode(cell, option, key)}${showLockedMark ? '<span class="locked-mark">Bloq.</span>' : ""}</strong>
+        <strong>${option.code}${showLockedMark ? '<span class="locked-mark">Bloq.</span>' : ""}</strong>
         ${showLabel ? `<span>${displayLabel}</span>` : ""}
       `;
       button.addEventListener("click", () => openCellEditor(weekKey, agent.id, key));
@@ -1594,7 +1593,6 @@ function buildLegendNode(extraClass = "") {
     <span><i class="swatch admin-combo"></i>Media jornada ADM + turno</span>
     <span><i class="swatch medical"></i>Licencia médica</span>
     <span><i class="swatch union"></i>Salida sindicato</span>
-    <span><i class="swatch monthly"></i>Viernes B mensual (M)</span>
     <span><i class="swatch holiday"></i>Feriado</span>
     <span><i class="swatch recess"></i>Receso institucional</span>
   `;
@@ -2368,18 +2366,8 @@ function shouldShowLockedMark(cell, expired = false) {
   return Boolean(canEdit() && (expired || cell?.note === "Bloqueo recurrente" || cell?.note === "Bloqueo manual") && !isClosedCell(cell));
 }
 
-function isMonthlyFridayBCell(cell, dayKey = "") {
-  if (!isMonthlyFridayBAssignmentCell(cell)) return false;
-  const date = new Date(`${dayKey}T00:00:00`);
-  return !Number.isNaN(date.getTime()) && isoDay(date) === 5;
-}
-
 function isMonthlyFridayBAssignmentCell(cell) {
   return isOnsiteShift(cell, "B") && !isPartialAdminStatus(cell?.status);
-}
-
-function displayCellCode(cell, option, dayKey = "") {
-  return `${option.code}${isMonthlyFridayBCell(cell, dayKey) ? " (M)" : ""}`;
 }
 
 function syncUnionOptions(agentName) {
